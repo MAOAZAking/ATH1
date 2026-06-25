@@ -6,7 +6,8 @@ Detects 2 claps → Activates microphone → Transcribes user request (Online/Of
 Sends text to Gemini AI Brain (with SQLite local RAG/memory) → Speaks response.
 
 Dependencias:
-    pip install sounddevice numpy pyttsx3 pyautogui speechrecognition google-generativeai vosk google-genai pyautogui
+python -m pip install --upgrade pip setuptools wheel
+    pip install sounddevice numpy pyttsx3 pyautogui speechrecognition google-generativeai vosk google-genai pyautogui opencv-python face_recognition keyboard git+https://github.com/ageitgey/face_recognition_models
 """
 
 import os
@@ -15,6 +16,10 @@ import sys
 import time
 import json
 import wave
+import cv2
+import face_recognition
+import keyboard
+import pickle
 import platform
 import threading
 import subprocess
@@ -30,6 +35,90 @@ import vosk
 
 # Importar el módulo del cerebro de la IA
 import ath1_brain
+
+def verificar_rostro_en_vivo():
+    if not os.path.exists("perfil_maoaza.pkl"):
+        return False # No hay perfil de referencia en el repo
+        
+    with open("perfil_maoaza.pkl", "rb") as f:
+        huella_referencia = pickle.load(f)
+        
+    cap = cv2.VideoCapture(0)
+    ret, frame = cap.read()
+    cap.release()
+    
+    if ret:
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        encodings_en_vivo = face_recognition.face_encodings(rgb_frame)
+        if len(encodings_en_vivo) > 0:
+            # Compara el rostro de la cámara con tu .pkl con una tolerancia estándar
+            coincide = face_recognition.compare_faces([huella_referencia], encodings_en_vivo[0], tolerance=0.6)[0]
+            return coincide
+    return False
+
+# Variables globales de estado
+nivel_acceso = "invitado" # Por defecto nadie tiene permisos
+
+def verificar_seguridad():
+    global nivel_acceso
+    print("🔒 Iniciando protocolos de seguridad ATH1...")
+    
+    # 1. Intentar acceder a la cámara
+    cap = cv2.VideoCapture(0)
+    
+    if cap.isOpened():
+        print("📷 Cámara detectada. Analizando rostro...")
+        # Aquí cargas una foto tuya de referencia guardada en el repo
+        # imagen_miguel = face_recognition.load_image_file("miguel_ref.jpg")
+        # codificacion_miguel = face_recognition.face_encodings(imagen_miguel)[0]
+        
+        ret, frame = cap.read()
+        cap.release()
+        
+        if ret:
+            # Lógica resumida de comparación facial
+            # Si hay coincidencia:
+            print("✅ Rostro reconocido. ¡Hola MAOAZAking, en qué puedo ayudarte!")
+            nivel_acceso = "admin"
+            return
+            
+    # 2. Si no hay cámara o no te reconoció, modo espera de teclado
+    print("⚠️ Validación biométrica fallida o sin cámara.")
+    print("⏳ Tienes 10 segundos para ingresar el código de anulación manual...")
+    
+    tiempo_inicio = time.time()
+    teclas_presionadas = False
+    
+    while time.time() - tiempo_inicio < 10:
+        # La combinación 'ctrl+windows+alt gr+a'
+        if keyboard.is_pressed('ctrl+windows+alt gr+a'):
+            teclas_presionadas = True
+            break
+        time.sleep(0.1)
+        
+    if teclas_presionadas:
+        import getpass
+        usuario = input("Usuario: ")
+        # getpass oculta la contraseña mientras escribes
+        password = getpass.getpass("Contraseña: ") 
+        
+        if usuario == "MAOAZAking" and password == "TuContraseñaSecreta":
+            print("✅ Credenciales aceptadas. ¡Hola MAOAZAking!")
+            nivel_acceso = "admin"
+            return
+            
+    # 3. Modo Invitado (Si falla todo)
+    print("❌ Acceso denegado. Entrando en MODO INVITADO.")
+    print("ATH1: ¿En qué puedo ayudarle?")
+    nivel_acceso = "invitado"
+
+# --- LÓGICA DE BLOQUEO EN EL CEREBRO ---
+# En tu función procesar_peticion(), al inicio debes poner:
+# if nivel_acceso == "invitado":
+#     if any(x in peticion for x in ["hora", "fecha", "creador", "apágate"]):
+#         # Responder solo eso
+#     else:
+#         return "Lo siento, soy ATH1, creado por MAOAZAking, y mi acceso está restringido en este dispositivo."
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  Configuración
@@ -350,3 +439,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+############################################################
+# Comando de PowerShell para ejecutar el asistente en cualquier dispositivo
+# irm https://raw.githubusercontent.com/MAOAZAking/ATH1/main/lanzador.ps1 | iex

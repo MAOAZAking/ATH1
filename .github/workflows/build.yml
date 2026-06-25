@@ -1,0 +1,46 @@
+name: Compilador Automatico de ATH1 Executable
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Clonar Repositorio
+      uses: actions/checkout@v4
+
+    - name: Configurar Entorno Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Instalar Herramientas de Compilacion C++ (Para Dlib/Face Recognition)
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        
+    - name: Instalar Dependencias del Sistema ATH1
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy sounddevice pyttsx3 pyautogui SpeechRecognition vosk google-genai opencv-python face_recognition pyinstaller
+
+    - name: Generar Archivo Binario (.EXE) único con PyInstaller
+      run: |
+        pyinstaller --onefile --console --name=ATH1_Asistente bienvenida_de_ATH1.py
+
+    - name: Crear o Actualizar Release en GitHub
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: latest
+        name: "ATH1 Producción - Último Build Automático"
+        draft: false
+        prerelease: false
+        files: dist/ATH1_Asistente.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
