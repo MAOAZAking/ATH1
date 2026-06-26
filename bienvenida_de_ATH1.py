@@ -6,7 +6,7 @@ Detects 2 claps → Activates microphone → Transcribes user request (Online/Of
 Sends text to Gemini AI Brain (with SQLite local RAG/memory) → Speaks response.
 
 Dependencias:
-python -m pip install --upgrade pip setuptools wheel
+python -m pip install opencv-contrib-python
     pip install sounddevice numpy pyttsx3 pyautogui speechrecognition google-generativeai vosk google-genai pyautogui opencv-python face_recognition keyboard git+https://github.com/ageitgey/face_recognition_models
 """
 
@@ -37,24 +37,30 @@ import vosk
 import ath1_brain
 
 def verificar_rostro_en_vivo():
-    if not os.path.exists("perfil_maoaza.pkl"):
-        return False # No hay perfil de referencia en el repo
+    if not os.path.exists("modelo_facial.yml"):
+        return False
         
-    with open("perfil_maoaza.pkl", "rb") as f:
-        huella_referencia = pickle.load(f)
-        
+    reconocedor = cv2.face.LBPHFaceRecognizer_create()
+    reconocedor.read("modelo_facial.yml")
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    
     cap = cv2.VideoCapture(0)
     ret, frame = cap.read()
     cap.release()
     
     if ret:
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        encodings_en_vivo = face_recognition.face_encodings(rgb_frame)
-        if len(encodings_en_vivo) > 0:
-            # Compara el rostro de la cámara con tu .pkl con una tolerancia estándar
-            coincide = face_recognition.compare_faces([huella_referencia], encodings_en_vivo[0], tolerance=0.6)[0]
-            return coincide
-    return False
+        gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        rostros = face_cascade.detectMultiScale(gris, 1.3, 5)
+        
+        for (x, y, w, h) in rostros:
+            rostro_recortado = gris[y:y+h, x:x+w]
+            # Predict devuelve el ID (1) y la "confianza" (menor a 60 es buena coincidencia)
+            id_usuario, confianza = reconocedor.predict(rostro_recortado)
+            
+            if id_usuario == 1 and confianza < 70:
+                return True # Eres tú
+                
+    return False # No detectado o no coincide
 
 # Variables globales de estado
 nivel_acceso = "invitado" # Por defecto nadie tiene permisos
