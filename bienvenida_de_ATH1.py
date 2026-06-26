@@ -7,7 +7,7 @@ Sends text to Gemini AI Brain (with SQLite local RAG/memory) → Speaks response
 
 Dependencias:
 python -m pip install opencv-contrib-python
-    pip install sounddevice numpy pyttsx3 pyautogui speechrecognition google-generativeai vosk google-genai pyautogui opencv-python face_recognition keyboard git+https://github.com/ageitgey/face_recognition_models
+    pip install sounddevice numpy pyttsx3 pyautogui speechrecognition google-generativeai vosk google-genai pyautogui opencv-python
 """
 
 import os
@@ -17,9 +17,7 @@ import time
 import json
 import wave
 import cv2
-import face_recognition
 import keyboard
-import pickle
 import platform
 import threading
 import subprocess
