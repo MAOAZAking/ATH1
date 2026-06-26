@@ -35,32 +35,68 @@ import vosk
 # Importar el módulo del cerebro de la IA
 import ath1_brain
 
-def verificar_rostro_en_vivo():
-    if not os.path.exists("modelo_facial.yml"):
-        return False
-        
-    reconocedor = cv2.face.LBPHFaceRecognizer_create()
-    reconocedor.read("modelo_facial.yml")
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    
-    cap = cv2.VideoCapture(0)
-    ret, frame = cap.read()
-    cap.release()
-    
-    if ret:
-        gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        rostros = face_cascade.detectMultiScale(gris, 1.3, 5)
-        
-        for (x, y, w, h) in rostros:
-            rostro_recortado = gris[y:y+h, x:x+w]
-            # Predict devuelve el ID (1) y la "confianza" (menor a 60 es buena coincidencia)
-            id_usuario, confianza = reconocedor.predict(rostro_recortado)
-            
-            if id_usuario == 1 and confianza < 70:
-                return True # Eres tú
-                
-    return False # No detectado o no coincide
+# Variables globales de estado
+nivel_acceso = "invitado" 
 
+def verificar_seguridad():
+    global nivel_acceso
+    print("🔒 Iniciando protocolos de seguridad ATH1...")
+    
+    # 1. Intentar acceder a la cámara con el modelo biométrico ligero
+    if os.path.exists("modelo_facial.yml"):
+        print("📷 Cámara detectada y modelo encontrado. Analizando rostro...")
+        reconocedor = cv2.face.LBPHFaceRecognizer_create()
+        reconocedor.read("modelo_facial.yml")
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        cap = cv2.VideoCapture(0)
+        ret, frame = cap.read()
+        cap.release()
+        
+        if ret:
+            gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            rostros = face_cascade.detectMultiScale(gris, 1.3, 5)
+            
+            for (x, y, w, h) in rostros:
+                rostro_recortado = gris[y:y+h, x:x+w]
+                id_usuario, confianza = reconocedor.predict(rostro_recortado)
+                
+                # Si la confianza es menor a 70, es una buena coincidencia
+                if id_usuario == 1 and confianza < 70:
+                    print("✅ Rostro reconocido. ¡Hola MAOAZAking, en qué puedo ayudarte!")
+                    nivel_acceso = "admin"
+                    return
+    else:
+        print("⚠️ No se encontró 'modelo_facial.yml' en el sistema, omitiendo cámara...")
+
+    # 2. Modo espera de teclado (si no hay cámara o falló el reconocimiento)
+    print("⚠️ Validación biométrica fallida o sin cámara.")
+    print("⏳ Tienes 10 segundos para ingresar la anulación manual (Ctrl + Windows + AltGr + A)...")
+    
+    tiempo_inicio = time.time()
+    teclas_presionadas = False
+    
+    while time.time() - tiempo_inicio < 10:
+        if keyboard.is_pressed('ctrl+windows+alt gr+a'):
+            teclas_presionadas = True
+            break
+        time.sleep(0.1)
+        
+    if teclas_presionadas:
+        usuario = input("Usuario: ")
+        password = getpass.getpass("Contraseña: ") 
+        
+        # Cambia "TuContraseñaSecreta" por la que quieras
+        if usuario == "MAOAZAking" and password == "TuContraseñaSecreta":
+            print("✅ Credenciales aceptadas. ¡Hola MAOAZAking!")
+            nivel_acceso = "admin"
+            return
+            
+    # 3. Modo Invitado
+    print("❌ Acceso denegado. Entrando en MODO INVITADO.")
+    print("ATH1: ¿En qué puedo ayudarle?")
+    nivel_acceso = "invitado"
+    
 # Variables globales de estado
 nivel_acceso = "invitado" # Por defecto nadie tiene permisos
 
@@ -330,6 +366,7 @@ def hablar(texto: str):
 #  Main Loop
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
+    verificar_seguridad()
     print("=" * 55)
     print("  🤖  ASISTENTE DE INTELIGENCIA ARTIFICIAL ATH1 ACTIVADO")
     print("  🎤  Escuchando tu huella geométrica para despertar... (Ctrl+C para salir)")
