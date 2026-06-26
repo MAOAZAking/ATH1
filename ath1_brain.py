@@ -472,11 +472,34 @@ def check_internet() -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 #  Procesamiento Principal (Gemini / Offline DB + RAG)
 # ──────────────────────────────────────────────────────────────────────────────
-def procesar_peticion(peticion: str) -> str:
+def procesar_peticion(peticion: str, nivel_acceso: str = "admin") -> str:
     if not peticion.strip():
         return "No te he escuchado con claridad. ¿Podrías repetirlo?"
         
-    print(f"\n🧠 Procesando petición: «{peticion}»")
+    print(f"\n🧠 Procesando petición: «{peticion}» (Nivel: {nivel_acceso.upper()})")
+    
+    q_min = peticion.lower()
+
+    # ─── RESTRICCIÓN DE MODO INVITADO ───
+    if nivel_acceso == "invitado":
+        comandos_basicos = ["hora", "fecha", "creador", "quien eres", "apágate", "apagate", "apagar", "hora es", "fecha es"]
+        
+        # Si la orden no incluye alguna de estas palabras, se rechaza inmediatamente
+        if not any(x in q_min for x in comandos_basicos):
+            respuesta_restringida = "Lo siento. Soy ATH1, un asistente de inteligencia artificial desarrollado por MAOAZAking. Mis funciones avanzadas están restringidas por seguridad en este dispositivo. Solo estoy autorizado para indicarte la hora, la fecha o apagarme."
+            guardar_historial_chat(peticion, respuesta_restringida)
+            return respuesta_restringida
+            
+        # Si preguntó por su creador, responde en seco
+        if any(x in q_min for x in ["creador", "quien eres"]):
+            return "Fui desarrollado y programado en Python por MAOAZAking. Soy su asistente virtual y motor analítico personal."
+
+    # ─── FLUJO NORMAL PARA EL ADMINISTRADOR (MAOAZAking) ───
+    # A partir de aquí, el código fluye normal porque pasó el filtro o es admin
+    accion_msg = ejecutar_accion_sistema(peticion)
+    if accion_msg:
+        guardar_historial_chat(peticion, accion_msg)
+        return accion_msg
     
     accion_msg = ejecutar_accion_sistema(peticion)
     if accion_msg:

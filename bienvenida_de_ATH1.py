@@ -7,7 +7,8 @@ Sends text to Gemini AI Brain (with SQLite local RAG/memory) → Speaks response
 
 Dependencias:
 python -m pip install opencv-contrib-python
-    pip install sounddevice numpy pyttsx3 pyautogui speechrecognition google-generativeai vosk google-genai pyautogui opencv-python
+python -m pip install --upgrade pip
+        pip install numpy sounddevice pyttsx3 pyautogui SpeechRecognition vosk google-genai opencv-contrib-python pyinstaller keyboard
 """
 
 import os
@@ -100,59 +101,74 @@ def verificar_seguridad():
 # Variables globales de estado
 nivel_acceso = "invitado" # Por defecto nadie tiene permisos
 
+# Envolvemos keyboard en un try-except por si se ejecuta sin permisos de Administrador
+try:
+    import keyboard
+    teclado_disponible = True
+except ImportError:
+    teclado_disponible = False
+
 def verificar_seguridad():
-    global nivel_acceso
     print("🔒 Iniciando protocolos de seguridad ATH1...")
     
-    # 1. Intentar acceder a la cámara
-    cap = cv2.VideoCapture(0)
-    
-    if cap.isOpened():
+    # 1. Validación Biométrica con OpenCV Ligero
+    if os.path.exists("modelo_facial.yml"):
         print("📷 Cámara detectada. Analizando rostro...")
-        # Aquí cargas una foto tuya de referencia guardada en el repo
-        # imagen_miguel = face_recognition.load_image_file("miguel_ref.jpg")
-        # codificacion_miguel = face_recognition.face_encodings(imagen_miguel)[0]
-        
-        ret, frame = cap.read()
-        cap.release()
-        
-        if ret:
-            # Lógica resumida de comparación facial
-            # Si hay coincidencia:
-            print("✅ Rostro reconocido. ¡Hola MAOAZAking, en qué puedo ayudarte!")
-            nivel_acceso = "admin"
-            return
+        try:
+            reconocedor = cv2.face.LBPHFaceRecognizer_create()
+            reconocedor.read("modelo_facial.yml")
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
             
-    # 2. Si no hay cámara o no te reconoció, modo espera de teclado
-    print("⚠️ Validación biométrica fallida o sin cámara.")
-    print("⏳ Tienes 10 segundos para ingresar el código de anulación manual...")
-    
-    tiempo_inicio = time.time()
-    teclas_presionadas = False
-    
-    while time.time() - tiempo_inicio < 10:
-        # La combinación 'ctrl+windows+alt gr+a'
-        if keyboard.is_pressed('ctrl+windows+alt gr+a'):
-            teclas_presionadas = True
-            break
-        time.sleep(0.1)
-        
-    if teclas_presionadas:
-        import getpass
-        usuario = input("Usuario: ")
-        # getpass oculta la contraseña mientras escribes
-        password = getpass.getpass("Contraseña: ") 
-        
-        if usuario == "MAOAZAking" and password == "TuContraseñaSecreta":
-            print("✅ Credenciales aceptadas. ¡Hola MAOAZAking!")
-            nivel_acceso = "admin"
-            return
+            cap = cv2.VideoCapture(0)
+            ret, frame = cap.read()
+            cap.release()
             
-    # 3. Modo Invitado (Si falla todo)
-    print("❌ Acceso denegado. Entrando en MODO INVITADO.")
-    print("ATH1: ¿En qué puedo ayudarle?")
-    nivel_acceso = "invitado"
+            if ret:
+                gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                rostros = face_cascade.detectMultiScale(gris, 1.3, 5)
+                for (x, y, w, h) in rostros:
+                    rostro_recortado = gris[y:y+h, x:x+w]
+                    id_usuario, confianza = reconocedor.predict(rostro_recortado)
+                    if id_usuario == 1 and confianza < 70:
+                        print("✅ Rostro reconocido. ¡Hola MAOAZAking, en qué puedo ayudarte!")
+                        return "admin"
+        except Exception as e:
+            print(f"⚠️ Error en lectura de cámara: {e}")
+    else:
+        print("⚠️ No se encontró 'modelo_facial.yml'.")
 
+    # 2. Validación de Teclado Manual
+    print("⚠️ Validación biométrica fallida.")
+    
+    if teclado_disponible:
+        print("⏳ Tienes 10 segundos para ingresar el código maestro (Ctrl+Windows+AltGr+A)...")
+        tiempo_inicio = time.time()
+        teclas_presionadas = False
+        
+        try:
+            while time.time() - tiempo_inicio < 10:
+                if keyboard.is_pressed('ctrl+windows+alt gr+a'):
+                    teclas_presionadas = True
+                    break
+                time.sleep(0.1)
+        except Exception as e:
+            print("⚠️ Permisos de administrador insuficientes para leer combinaciones secretas en este PC.")
+            teclas_presionadas = False
+    else:
+        teclas_presionadas = False
+
+    # Si se presionaron las teclas, pedir contraseña
+    if teclas_presionadas:
+        usuario = input("\nUsuario: ")
+        password = getpass.getpass("Contraseña: ") 
+        if usuario == "MAOAZAking" and password == "TuContraseñaSecreta":
+            print("✅ Credenciales aceptadas. ¡Bienvenido de nuevo, creador!")
+            return "admin"
+            
+    # 3. Modo Invitado
+    print("\n❌ ACCESO DENEGADO. MODO INVITADO ACTIVADO.")
+    print("ATH1: Operando con funciones restringidas. ¿En qué puedo ayudarle?")
+    return "invitado"
 # --- LÓGICA DE BLOQUEO EN EL CEREBRO ---
 # En tu función procesar_peticion(), al inicio debes poner:
 # if nivel_acceso == "invitado":
@@ -316,7 +332,7 @@ def procesar_orden():
         if wav_io:
             texto = transcribir_audio(wav_io)
             if texto.strip():
-                respuesta = ath1_brain.procesar_peticion(texto)
+                respuesta = ath1_brain.procesar_peticion(texto, nivel_acceso)
                 
                 # Capturar orden de apagado
                 if respuesta == "APAGANDO_SISTEMA":
@@ -366,10 +382,11 @@ def hablar(texto: str):
 #  Main Loop
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
-    verificar_seguridad()
+    # Determinamos quién está usando el PC antes de iniciar la escucha
+    nivel_acceso = verificar_seguridad()
+    
     print("=" * 55)
-    print("  🤖  ASISTENTE DE INTELIGENCIA ARTIFICIAL ATH1 ACTIVADO")
-    print("  🎤  Escuchando tu huella geométrica para despertar... (Ctrl+C para salir)")
+    print("  🤖  ASISTENTE DE INTELIGENCIA ARTIFICIAL ATH1")
     print("=" * 55)
 
     huellas_templates = []
@@ -465,7 +482,7 @@ def main():
                                 # Aquí puedes llamar directo a tu lógica de procesamiento o procesar_orden()
                                 # NOTA: Asegúrate de que tu función procesar_orden() capture el 'texto' actual 
                                 # o llama directo a 'ath1_brain.procesar_peticion(texto)'
-                                respuesta = ath1_brain.procesar_peticion(texto)
+                                respuesta = ath1_brain.procesar_peticion(texto, nivel_acceso)
                                 hablar(respuesta)
                             
                             # Limpieza e inicio limpio para la siguiente orden en cola
