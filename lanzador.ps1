@@ -1,7 +1,7 @@
 # lanzador.ps1 - Ejecución Efímera de ATH1
 
 $TempPath = "$env:TEMP\ATH1_Ejecucion"
-$ExeUrl = "AQUI_VA_EL_LINK_DE_TU_RELEASE_ATH1.exe" # El link que generará GitHub Actions
+$ExeUrl = "https://github.com/MAOAZAking/ATH1/releases/download/latest/ATH1_Asistente.exe" # El link que generará GitHub Actions
 $ExePath = "$TempPath\ATH1.exe"
 
 # 1. Crear entorno aislado y temporal
