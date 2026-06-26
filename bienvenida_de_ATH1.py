@@ -8,28 +8,24 @@ Sends text to Gemini AI Brain (with SQLite local RAG/memory) → Speaks response
 Dependencias:
 python -m pip install opencv-contrib-python
 python -m pip install --upgrade pip
-        pip install numpy sounddevice pyttsx3 pyautogui SpeechRecognition vosk google-genai opencv-contrib-python pyinstaller keyboard python-dotenv
+        pip install numpy sounddevice pyttsx3 pyautogui SpeechRecognition vosk google-genai opencv-contrib-python pyinstaller keyboard python-dotenv selenium webdriver-manager
 """
 
 #!/usr/bin/env python3
-import os
 import io
+import os
 import sys
 import time
 import json
 import wave
 import cv2
 import keyboard
-import difflib
-import platform  # <--- ESTA LÍNEA ES LA QUE TE FALTA
+import platform
 import getpass
 import threading
 import subprocess
 import webbrowser
 import pyautogui
-from google import genai
-from google.genai import types # IMPORTANTE AÑADIR ESTO
-
 import numpy as np
 import sounddevice as sd
 import pyttsx3
@@ -37,6 +33,7 @@ import speech_recognition as sr
 import vosk
 from dotenv import load_dotenv
 
+# Módulos propios
 import ath1_brain
 from entrenar_nombre import extraer_espectrograma, calcular_distancia_dtw
 
@@ -288,13 +285,17 @@ def procesar_orden():
                 respuesta = ath1_brain.procesar_peticion(texto, nivel_acceso)
                 
                 # Capturar orden de apagado
-                if respuesta == "APAGANDO_SISTEMA":
+                #if respuesta == "APAGANDO_SISTEMA":
+                if "APAGANDO_SISTEMA" in respuesta:
                     if nivel_acceso == "admin":
                         hablar("Hasta luego MAOAZAking, que tengas un buen día.")
+                        sys.exit(0) # Esto mata el proceso y cierra el programa
+                        os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
                     else:
                         hablar("Adiós.")
-                    os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
-                    
+                        sys.exit(0) # Esto mata el proceso y cierra el programa
+                        os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
+                    #os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
                 hablar(respuesta)
             else:
                 hablar("No logré comprender tu petición.")

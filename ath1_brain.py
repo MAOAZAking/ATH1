@@ -10,46 +10,32 @@ Handles:
 - Online/Offline self-learning (extracting and saving facts to the DB).
 - Actuator actions (minimizing windows, volume control, locking computer, time/date, VS Code, YouTube).
 """
-import os
-import io
-import sys
-import json
-import wave
-import cv2
-import keyboard
-import difflib
-import platform  # <--- ESTA LÍNEA ES LA QUE TE FALTA
-import getpass
-import threading
-import subprocess
-import webbrowser
-import pyautogui
-from google import genai
-from google.genai import types # IMPORTANTE AÑADIR ESTO
 
-import numpy as np
-import sounddevice as sd
-import pyttsx3
-import speech_recognition as sr
-import vosk
-from dotenv import load_dotenv
-
-
+####################################################################################
+# pip install selenium webdriver-manager
 import re
-import sys
 import time
+import shutil
+import urllib.parse
+import os
+import sys
 import sqlite3
 import datetime
-import urllib.parse
-import urllib.request
 import webbrowser
-import platform
 import subprocess
-import shutil
-import pyautogui
 import difflib
-# 🌟 Importación del NUEVO SDK OFICIAL DE GOOGLE
+import platform
+import pyautogui
+# SDK de Google
 from google import genai
+from google.genai import types
+from dotenv import load_dotenv
+
+################### IMPORTACION DE SELENIUM PARA YOUTUBE EL PRIMER VIDEO ###################
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 DB_NAME = "ath1_knowledge.db"
 
@@ -301,28 +287,63 @@ def guardar_comando_dinamico(trigger: str, accion: str, respuesta: str):
 def buscar_y_ejecutar_comando_dinamico(query: str) -> str:
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    # Busca si el usuario dijo exactamente el trigger o algo que lo contenga
-    cursor.execute("SELECT accion, respuesta FROM comandos_dinamicos WHERE ? LIKE '%' || trigger || '%'", (query.lower(),))
-    row = cursor.fetchone()
+    cursor.execute("SELECT trigger, accion, respuesta FROM comandos_dinamicos")
+    rows = cursor.fetchall()
     conn.close()
     
-    if row:
-        accion, respuesta = row
-        
-        # 1. Ejecutar Acción si existe
-        if accion.startswith("OPEN_URL|"):
-            url = accion.split("|")[1].strip()
-            import webbrowser
-            webbrowser.open(url)
-            
-        # 2. Inyectar variables dinámicas en el texto de respuesta
-        if "{hora}" in respuesta:
-            hora_actual = datetime.datetime.now().strftime("%I:%M %p")
-            respuesta = respuesta.replace("{hora}", hora_actual)
-            
-        return respuesta
-        
+    if not rows:
+        return ""
+
+    # Extraer todos los disparadores conocidos
+    triggers = [row[0] for row in rows]
+    # Comparar la petición del usuario con los disparadores
+    coincidencias = difflib.get_close_matches(query.lower().strip(), triggers, n=1, cutoff=0.6)
+    
+    if coincidencias:
+        match = coincidencias[0]
+        # Buscar la fila correspondiente al match
+        for r in rows:
+            if r[0] == match:
+                accion, respuesta = r[1], r[2]
+                
+                # Ejecutar acción si existe
+                if accion and accion != "NINGUNA" and accion.startswith("OPEN_URL|"):
+                    url = accion.split("|")[1].strip()
+                    webbrowser.open(url)
+                
+                # Reemplazar variables dinámicas
+                if "{hora}" in respuesta:
+                    respuesta = respuesta.replace("{hora}", datetime.datetime.now().strftime("%I:%M %p"))
+                
+                return respuesta
     return ""
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Accion de Selenium para abrir YouTube y reproducir el primer video 100% seguro de que reproduce
+# ──────────────────────────────────────────────────────────────────────────────
+
+def buscar_y_reproducir_selenium(termino_busqueda: str):
+    """Abre Chrome usando el gestor nativo de Selenium, busca y reproduce el primer video."""
+    options = webdriver.ChromeOptions()
+    # Mantiene la ventana de Chrome abierta tras finalizar la función
+    options.add_experimental_option("detach", True) 
+    
+    # Selenium detecta tu Chrome e instala el driver automáticamente sin código extra
+    driver = webdriver.Chrome(options=options)
+    
+    url = f"https://youtube.com{urllib.parse.quote(termino_busqueda)}"
+    driver.get(url)
+    
+    try:
+        # Espera hasta 10 segundos a que aparezca el primer video real
+        esperar = WebDriverWait(driver, 10)
+        primer_video = esperar.until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "ytd-video-renderer #video-title"))
+        )
+        primer_video.click()
+        print("DEBUG: Video localizado y reproducido con Selenium Nativo.")
+    except Exception as e:
+        print(f"DEBUG: No se pudo hacer clic en el video. Error: {e}")
 # ──────────────────────────────────────────────────────────────────────────────
 #  Actuadores de Sistema (Acciones)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -384,10 +405,8 @@ def ejecutar_accion_sistema(query: str) -> str:
             webbrowser.open(url)
             
             # Automatización: Esperar carga y dar Enter al primer video
-            print("⏳ Esperando que cargue YouTube para seleccionar el video...")
-            time.sleep(4.5) 
-            pyautogui.press('tab')
-            pyautogui.press('enter')
+            print("⏳ Se esta abriendo YouTube, por favor espera...")
+            buscar_y_reproducir_selenium(termino)
             return f"He buscado '{termino}' en YouTube e intenté reproducir el primer video."
         
         # Caso B: Abrir la página limpia
@@ -399,15 +418,15 @@ def ejecutar_accion_sistema(query: str) -> str:
         pyautogui.press('enter') # Ejecuta la entrada al video
         return "Intentando reproducir el primer video en pantalla."
     
-    if any(x in q for x in ["pantalla completa", "maximiza el video", "pantalla completa"]):
+    if any(x in q for x in ["pantalla completa", "maximiza el video", "grande el video", "maximiza la pantalla", "grande la pantalla"]):
         pyautogui.press('f')
         return "Activando pantalla completa."
         
-    if any(x in q for x in ["subtítulos", "subtitulo", "activa subtitulos"]):
+    if any(x in q for x in ["subtítulos", "subtitulo", "activa subtitulos", "desactiva subtitulos", "subtitulos del video", "subtitulos", "subtítulos del video", "subtítulos"]):
         pyautogui.press('c')
         return "Alternando subtítulos del video."
         
-    if any(x in q for x in ["pausa", "paúsalo", "reproduce el video", "continúa"]):
+    if any(x in q for x in ["pausa", "paúsalo", "reproduce el video", "continúa", "reanuda el video", "pausar el video", "reanudar el video", "pausa el video", "pausar", "reanudar", "despausar", "despausa", "pausalo", "reanudarlo"]):
         pyautogui.press('space')
         return "He pausado o reanudado el reproductor."
 
