@@ -20,6 +20,7 @@ import json
 import wave
 import cv2
 import keyboard
+import difflib
 import platform  # <--- ESTA LÍNEA ES LA QUE TE FALTA
 import getpass
 import threading
@@ -27,6 +28,7 @@ import subprocess
 import webbrowser
 import pyautogui
 from google import genai
+from google.genai import types # IMPORTANTE AÑADIR ESTO
 
 import numpy as np
 import sounddevice as sd
@@ -53,16 +55,23 @@ def solicitar_desbloqueo():
     if nivel_acceso == "admin":
         return
         
-    print("\n[SISTEMA] Intervención manual solicitada. Ingrese credenciales maestras:")
-    u = input("Usuario: ")
-    p = getpass.getpass("Contraseña: ")
+    import tkinter as tk
+    from tkinter import simpledialog
     
-    # Compara con las variables ocultas en el .env (No están escritas en el código)
+    root = tk.Tk()
+    root.attributes("-topmost", True) # Fuerza la ventana al frente
+    root.withdraw() # Oculta la ventana principal, deja solo el cuadro de diálogo
+    
+    u = simpledialog.askstring("Seguridad ATH1", "Usuario:")
+    p = simpledialog.askstring("Seguridad ATH1", "Contraseña:", show='*')
+    
+    root.destroy()
+    
     if u == os.getenv("ATH1_USER") and p == os.getenv("ATH1_PASS"):
-        print("[SISTEMA] ✅ Acceso de administrador concedido. Todos los sistemas en línea.")
+        print("[SISTEMA] ✅ Acceso de administrador concedido.")
         nivel_acceso = "admin"
     else:
-        print("[SISTEMA] ❌ Credenciales incorrectas. Bloqueo mantenido.")
+        print("[SISTEMA] ❌ Credenciales incorrectas.")
         
 # Dejar el atajo escuchando en segundo plano de forma permanente
 try:
@@ -280,8 +289,11 @@ def procesar_orden():
                 
                 # Capturar orden de apagado
                 if respuesta == "APAGANDO_SISTEMA":
-                    hablar("Entendido. Apagando mis sistemas. Hasta luego programador.")
-                    sys.exit(0)
+                    if nivel_acceso == "admin":
+                        hablar("Hasta luego MAOAZAking, que tengas un buen día.")
+                    else:
+                        hablar("Adiós.")
+                    os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
                     
                 hablar(respuesta)
             else:
@@ -378,7 +390,13 @@ def main():
                             
                             if min(distancias) < 1.7: 
                                 stream.stop() 
-                                hablar("Hola, dime qué necesitas.")
+                                
+                                # Saludo dinámico según permisos
+                                if nivel_acceso == "admin":
+                                    import random
+                                    hablar(random.choice(["Sí señor.", "Aquí estoy señor.", "A sus órdenes."]))
+                                else:
+                                    hablar("Hola, dime qué necesitas.")
                                 
                                 # 🌟 ACTIVAMOS LA VENTANA DE ATENCIÓN DE 40 SEGUNDOS
                                 asistente_activo = True

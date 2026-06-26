@@ -10,8 +10,31 @@ Handles:
 - Online/Offline self-learning (extracting and saving facts to the DB).
 - Actuator actions (minimizing windows, volume control, locking computer, time/date, VS Code, YouTube).
 """
-
 import os
+import io
+import sys
+import json
+import wave
+import cv2
+import keyboard
+import difflib
+import platform  # <--- ESTA LÍNEA ES LA QUE TE FALTA
+import getpass
+import threading
+import subprocess
+import webbrowser
+import pyautogui
+from google import genai
+from google.genai import types # IMPORTANTE AÑADIR ESTO
+
+import numpy as np
+import sounddevice as sd
+import pyttsx3
+import speech_recognition as sr
+import vosk
+from dotenv import load_dotenv
+
+
 import re
 import sys
 import time
@@ -24,10 +47,29 @@ import platform
 import subprocess
 import shutil
 import pyautogui
+import difflib
 # 🌟 Importación del NUEVO SDK OFICIAL DE GOOGLE
 from google import genai
 
 DB_NAME = "ath1_knowledge.db"
+
+# Mapeo de comandos: "formas de decirlo" -> "ID_ACCION"
+MAPA_COMANDOS = {
+    "apágate": "ACTION_APAGAR",
+    "apaga el sistema": "ACTION_APAGAR",
+    "finalizar sesión": "ACTION_APAGAR",
+    "descansa": "ACTION_APAGAR",
+    
+    "abre youtube": "ACTION_YOUTUBE",
+    "pon youtube": "ACTION_YOUTUBE",
+    "quiero ver youtube": "ACTION_YOUTUBE",
+    
+    "abre gmail": "ACTION_GMAIL",
+    "revisa mi correo": "ACTION_GMAIL",
+    
+    "sube el volumen": "ACTION_VOLUMEN_UP",
+    "más volumen": "ACTION_VOLUMEN_UP"
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  Base de Datos (Inicialización y Carga de Conocimiento)
@@ -56,6 +98,13 @@ def init_db():
         CREATE TABLE IF NOT EXISTS user_profile (
             key TEXT PRIMARY KEY,
             value TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS comandos_dinamicos (
+            trigger TEXT PRIMARY KEY,
+            accion TEXT,
+            respuesta TEXT
         )
     """)
     conn.commit()
@@ -105,7 +154,20 @@ def seed_knowledge(conn):
     print(f"✅ Se insertaron {len(knowledge_data)} registros de conocimiento inicial.")
     
 
+COMANDOS_ESTANDAR = {
+    "apágate": "APAGANDO_SISTEMA",
+    "qué hora es": "COMANDO_HORA",
+    "abre youtube": "COMANDO_YOUTUBE"
+}
 
+def interpretar_intencion(texto_transcrito):
+    # Intenta encontrar una coincidencia aproximada (80% de similitud)
+    coincidencias = difflib.get_close_matches(texto_transcrito.lower(), COMANDOS_ESTANDAR.keys(), n=1, cutoff=0.8)
+    
+    if coincidencias:
+        comando_real = coincidencias[0]
+        return COMANDOS_ESTANDAR[comando_real]
+    return None
 # ──────────────────────────────────────────────────────────────────────────────
 #  Búsqueda de Conocimiento Local y Memoria
 # ──────────────────────────────────────────────────────────────────────────────
@@ -223,7 +285,44 @@ def obtener_perfil_usuario() -> str:
     except Exception as e:
         print(f"⚠️ Error al obtener perfil de usuario: {e}")
         return ""
+def guardar_comando_dinamico(trigger: str, accion: str, respuesta: str):
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO comandos_dinamicos (trigger, accion, respuesta) VALUES (?, ?, ?)", 
+                       (trigger.lower().strip(), accion, respuesta))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error al guardar comando dinámico: {e}")
+        return False
 
+def buscar_y_ejecutar_comando_dinamico(query: str) -> str:
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    # Busca si el usuario dijo exactamente el trigger o algo que lo contenga
+    cursor.execute("SELECT accion, respuesta FROM comandos_dinamicos WHERE ? LIKE '%' || trigger || '%'", (query.lower(),))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        accion, respuesta = row
+        
+        # 1. Ejecutar Acción si existe
+        if accion.startswith("OPEN_URL|"):
+            url = accion.split("|")[1].strip()
+            import webbrowser
+            webbrowser.open(url)
+            
+        # 2. Inyectar variables dinámicas en el texto de respuesta
+        if "{hora}" in respuesta:
+            hora_actual = datetime.datetime.now().strftime("%I:%M %p")
+            respuesta = respuesta.replace("{hora}", hora_actual)
+            
+        return respuesta
+        
+    return ""
 # ──────────────────────────────────────────────────────────────────────────────
 #  Actuadores de Sistema (Acciones)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -234,11 +333,34 @@ def ejecutar_accion_sistema(query: str) -> str:
     """
     q = query.lower().strip()
     
+    # 1. Buscar la mejor coincidencia en nuestro mapa
+    # Obtenemos todas las llaves posibles (las frases conocidas)
+    posibles_comandos = list(MAPA_COMANDOS.keys())
+    
+    # 2. Fuzzy Matching: Buscamos qué llave se parece más a lo que dijo el usuario
+    coincidencias = difflib.get_close_matches(q, posibles_comandos, n=1, cutoff=0.7)
+    
+    if coincidencias:
+        comando_detectado = coincidencias[0]
+        accion_id = MAPA_COMANDOS[comando_detectado]
+        
+        print(f"DEBUG: Interpreté '{q}' como '{comando_detectado}' -> Ejecutando: {accion_id}")
+        
+        # 3. Ejecutar la acción según el ID detectado
+        if accion_id == "ACTION_APAGAR":
+            return "APAGANDO_SISTEMA"
+            
+        elif accion_id == "ACTION_YOUTUBE":
+            webbrowser.open("https://youtube.com")
+            return "Abriendo YouTube para ti."
+            
+        elif accion_id == "ACTION_GMAIL":
+            webbrowser.open("https://mail.google.com")
+            return "Abriendo tu correo."
+    
     # ─── 0. COMANDO DE SEGURIDAD (Apagado / Interfaz Manual) ───
-    if any(x in q for x in ["apágate", "apagate", "apagar", "finalizar", "apagar sistema", "apaga los sistemas", "descansa", "finaliza la session"]):
-        KeyboardInterrupt("Se recibió la orden de apagado. Cerrando ATH1...")
-        return "APAGANDOME... \n\nHasta luego!, que tengas un buen día."
-        sys.exit()
+    if any(x in q for x in ["apágate", "apagate", "apagar", "finalizar", "apagar sistema", "apaga los sistemas", "apagar los sistemas", "descansa", "finaliza la session", "cierrate",]):
+        return "APAGANDO_SISTEMA"
         
     if any(x in q for x in ["quiero escribir", "escribirte algo", "escribir texto"]):
         import tkinter as tk
@@ -444,7 +566,7 @@ def ejecutar_accion_sistema(query: str) -> str:
             pass
         return f"He creado la carpeta de proyecto en tu escritorio y la he abierto en VS Code."
 
-    return ""
+    return None
 
 def analizar_aprendizaje_offline(query: str) -> str:
     match = re.search(r'(?i)(?:aprende|recuerda|guarda)\s+(?:que\s+)?(.+)', query)
@@ -498,11 +620,16 @@ def procesar_peticion(peticion: str, nivel_acceso: str = "admin") -> str:
 
     # ─── FLUJO NORMAL PARA EL ADMINISTRADOR (MAOAZAking) ───
     # A partir de aquí, el código fluye normal porque pasó el filtro o es admin
-    accion_msg = ejecutar_accion_sistema(peticion)
-    if accion_msg:
-        guardar_historial_chat(peticion, accion_msg)
-        return accion_msg
     
+    # ─── 1. BUSCAR EN MEMORIA DINÁMICA (Prioridad Alta) ───
+    # Si lo aprendiste, es la prioridad #1.
+    comando_aprendido = buscar_y_ejecutar_comando_dinamico(peticion)
+    if comando_aprendido:
+        guardar_historial_chat(peticion, comando_aprendido)
+        return comando_aprendido
+
+    # ─── 2. COMANDOS HARDCODED (Prioridad Media) ───
+    # Si no es un comando aprendido, revisa si es una orden de sistema (Apagar, etc)
     accion_msg = ejecutar_accion_sistema(peticion)
     if accion_msg:
         guardar_historial_chat(peticion, accion_msg)
@@ -522,73 +649,98 @@ def procesar_peticion(peticion: str, nivel_acceso: str = "admin") -> str:
     online = hay_internet and api_key is not None
     
     if online:
-        print("🌐 Modo ONLINE activo (Conectando vía google-genai...)")
+        print("🌐 Modo ONLINE activo (Conectando vía google-genai con Búsqueda en Internet...)")
         try:
-            # 🌟 Inicialización del nuevo SDK oficial de Google
             client = genai.Client(api_key=api_key)
             
-            prompt = f"""Eres ATH1, un asistente virtual inteligente y autónomo que controla la PC de MAOAZA.
-Tus respuestas deben ser naturales, precisas y concisas porque serán leídas en voz alta.
+            prompt = f"""Eres ATH1, el asistente virtual autónomo de MAOAZAking. Tienes acceso a internet.
 
-PERFIL Y PREFERENCIAS DEL USUARIO (Su estilo de pensar, ambiciones, proyectos y metas):
-{perfil_usuario if perfil_usuario else "(No hay datos registrados aún. Debes aprender de él.)"}
+CONOCIMIENTO LOCAL DEL USUARIO:
+{contexto_local}
 
-CONOCIMIENTO LOCAL (Extraído de tu base de datos SQLite por relevancia):
-{contexto_local if contexto_local else "(No hay coincidencias en base de datos local)"}
-
-HISTORIAL DE CHAT RECIENTE:
-{historial if historial else "(Inicio de conversación)"}
+HISTORIAL DE CHAT:
+{historial}
 
 PETICIÓN DEL USUARIO:
 "{peticion}"
 
-INSTRUCCIÓN ESPECIAL:
-1. Si el usuario te enseña un concepto de programación o dato general, acéptalo de forma amable y añade al final de tu respuesta una línea con este formato exacto para guardarlo en tu conocimiento:
-   [LEARN] categoria | palabra_clave | Hecho completo aprendido.
-   Ejemplo: "[LEARN] programacion | python decorador | Un decorador es una función que modifica otra función."
+REGLAS DE ACTUACIÓN (Súper Importante):
+1. Si el usuario te pide abrir una página, aplicación o servicio que tú no conoces (ej. "Abre Gmail"), DEBES BUSCAR LA URL en internet. 
+   Tu respuesta DEBE incluir obligatoriamente esta etiqueta exacta:
+   [ACTION] OPEN_URL | https://la-url-que-encontraste.com
+   Y luego dices algo como "Abriendo el sitio para ti."
 
-2. Si el usuario te habla sobre sus metas, su forma de pensar, sus ambiciones (como crear un Jarvis o su visión de proyectos futuros), o te explica cómo quiere que actúes y pienses, acéptalo y añade al final de tu respuesta una línea con este formato exacto para guardarlo en su perfil:
-   [PROFILE] clave_corta | Explicación detallada del rasgo de pensar o ambición del usuario.
-   Ejemplo: "[PROFILE] ambicion_jarvis | El usuario desea construir un asistente virtual autónomo tipo Jarvis para colaborar en futuros proyectos."
+2. Si el usuario te está enseñando una nueva forma de responder o actuar, DEBES extraer ese conocimiento y devolver esta etiqueta:
+   [LEARN_CMD] frase disparadora | ACCION | Respuesta con variables como {{hora}}
+   Ejemplo: Si te dice "pregunta: 'hora con segundos' respuesta: 'los segundos pasan rápido, son las (time)'"
+   Tú debes devolver: [LEARN_CMD] hora con segundos | NINGUNA | Los segundos pasan muy rápido, por esto te doy la hora solo con minutos. Actualmente son las {{hora}}.
 
-No uses estas etiquetas a menos que el usuario realmente te esté dando información nueva que requiera ser aprendida o guardada en su perfil.
+3. Si el usuario te enseña un concepto general, usa:
+   [LEARN] categoria | palabra_clave | Hecho aprendido.
+
+4. Si el usuario te habla sobre sus metas o perfil, usa:
+   [PROFILE] clave_corta | Explicación del rasgo.
+
+No uses estas etiquetas a menos que debas ejecutar una acción o aprender algo. ¡Usa la herramienta de búsqueda de Google si no sabes algo!
 
 Respuesta:"""
 
-            # 🌟 Llamada moderna al modelo de Gemini 1.5 Flash
+            # Activamos la búsqueda en internet de Gemini
+            from google.genai import types # Asegúrate de que esto se importe arriba en el archivo
+            
             response = client.models.generate_content(
                 model='gemini-1.5-flash',
                 contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[{"google_search": {}}] 
+                )
             )
             texto_respuesta = response.text.strip()
+            respuesta_limpia = []
             
-            if "[LEARN]" in texto_respuesta or "[PROFILE]" in texto_respuesta:
-                lineas = texto_respuesta.split("\n")
-                respuesta_limpia = []
-                for linea in lineas:
-                    if "[LEARN]" in linea:
-                        partes = linea.replace("[LEARN]", "").split("|")
-                        if len(partes) == 3:
-                            cat = partes[0].strip()
-                            keyword = partes[1].strip()
-                            content = partes[2].strip()
-                            guardado = guardar_conocimiento_local(cat, keyword, content)
-                            if guardado:
-                                print(f"💾 Gemini me ha enseñado un nuevo dato: [{cat}] {keyword} -> {content}")
-                    elif "[PROFILE]" in linea:
-                        partes = linea.replace("[PROFILE]", "").split("|")
-                        if len(partes) == 2:
-                            key = partes[0].strip()
-                            val = partes[1].strip()
-                            guardado = guardar_perfil_usuario(key, val)
-                            if guardado:
-                                print(f"💾 Perfil actualizado: {key} -> {val}")
-                    else:
-                        respuesta_limpia.append(linea)
-                texto_respuesta = "\n".join(respuesta_limpia).strip()
+            # --- MOTOR DE INTERPRETACIÓN Y APRENDIZAJE TOTAL ---
+            for linea in texto_respuesta.split("\n"):
+                if "[LEARN_CMD]" in linea:
+                    partes = linea.replace("[LEARN_CMD]", "").split("|")
+                    if len(partes) >= 3:
+                        trigger = partes[0].strip()
+                        accion = partes[1].strip()
+                        respuesta_txt = partes[2].strip()
+                        guardar_comando_dinamico(trigger, accion, respuesta_txt)
+                        print(f"💾 ¡NUEVA HABILIDAD APRENDIDA! Cuando escuche '{trigger}', haré '{accion}'.")
                 
-            guardar_historial_chat(peticion, texto_respuesta)
-            return texto_respuesta
+                elif "[ACTION]" in linea:
+                    accion = linea.replace("[ACTION]", "").strip()
+                    if accion.startswith("OPEN_URL"):
+                        url = accion.split("|")[1].strip()
+                        import webbrowser
+                        webbrowser.open(url)
+                        print(f"🌍 Ejecutando acción autónoma: Abriendo {url}")
+                
+                elif "[LEARN]" in linea:
+                    partes = linea.replace("[LEARN]", "").split("|")
+                    if len(partes) == 3:
+                        cat = partes[0].strip()
+                        keyword = partes[1].strip()
+                        content = partes[2].strip()
+                        guardado = guardar_conocimiento_local(cat, keyword, content)
+                        if guardado:
+                            print(f"💾 Gemini me ha enseñado un nuevo dato: [{cat}] {keyword} -> {content}")
+                            
+                elif "[PROFILE]" in linea:
+                    partes = linea.replace("[PROFILE]", "").split("|")
+                    if len(partes) == 2:
+                        key = partes[0].strip()
+                        val = partes[1].strip()
+                        guardado = guardar_perfil_usuario(key, val)
+                        if guardado:
+                            print(f"💾 Perfil actualizado: {key} -> {val}")
+                else:
+                    respuesta_limpia.append(linea)
+            
+            texto_final = "\n".join(respuesta_limpia).strip()
+            guardar_historial_chat(peticion, texto_final)
+            return texto_final
             
         except Exception as e:
             print(f"⚠️ Error en canal GenAI: {e}. Desviando a contingencia...")
