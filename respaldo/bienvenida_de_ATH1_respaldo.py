@@ -8,10 +8,9 @@ Sends text to Gemini AI Brain (with SQLite local RAG/memory) → Speaks response
 Dependencias:
 python -m pip install opencv-contrib-python
 python -m pip install --upgrade pip
-        pip install numpy sounddevice pyttsx3 pyautogui SpeechRecognition vosk google-genai opencv-contrib-python pyinstaller keyboard python-dotenv
+        pip install numpy sounddevice pyttsx3 pyautogui SpeechRecognition vosk google-genai opencv-contrib-python pyinstaller keyboard
 """
 
-#!/usr/bin/env python3
 import os
 import io
 import sys
@@ -20,60 +19,103 @@ import json
 import wave
 import cv2
 import keyboard
-import platform  # <--- ESTA LÍNEA ES LA QUE TE FALTA
+from dotenv import load_dotenv
+import platform
 import getpass
 import threading
 import subprocess
 import webbrowser
-import pyautogui
-from google import genai
+import pyautogui  # 🌟 Librería para controlar teclado/mouse físicamente
+from google import genai  # 🌟 El nuevo SDK oficial de Google
 
 import numpy as np
 import sounddevice as sd
 import pyttsx3
 import speech_recognition as sr
 import vosk
-from dotenv import load_dotenv
 
+# Importar el módulo del cerebro de la IA
 import ath1_brain
 from entrenar_nombre import extraer_espectrograma, calcular_distancia_dtw
 
-# ─── CONFIGURACIÓN DE SEGURIDAD Y VARIABLES (.ENV) ───
-# Esto asegura que PyInstaller encuentre las credenciales ocultas en cualquier PC
-if hasattr(sys, '_MEIPASS'):
-    load_dotenv(os.path.join(sys._MEIPASS, '.env'))
-else:
-    load_dotenv()
+# Variables globales de estado
+nivel_acceso = "invitado" 
 
-nivel_acceso = "invitado"
-
-def solicitar_desbloqueo():
-    """Se activa en cualquier momento al presionar Ctrl+Shift+F1"""
+def verificar_seguridad():
     global nivel_acceso
-    if nivel_acceso == "admin":
-        return
-        
-    print("\n[SISTEMA] Intervención manual solicitada. Ingrese credenciales maestras:")
-    u = input("Usuario: ")
-    p = getpass.getpass("Contraseña: ")
+    print("🔒 Iniciando protocolos de seguridad ATH1...")
     
-    # Compara con las variables ocultas en el .env (No están escritas en el código)
-    if u == os.getenv("ATH1_USER") and p == os.getenv("ATH1_PASS"):
-        print("[SISTEMA] ✅ Acceso de administrador concedido. Todos los sistemas en línea.")
-        nivel_acceso = "admin"
-    else:
-        print("[SISTEMA] ❌ Credenciales incorrectas. Bloqueo mantenido.")
-        
-# Dejar el atajo escuchando en segundo plano de forma permanente
-try:
-    keyboard.add_hotkey('ctrl+shift+f1', solicitar_desbloqueo)
-except Exception:
-    pass # Ignora silenciosamente si el ejecutable se abre sin permisos de administrador
-
-def escaneo_facial_silencioso():
-    """Revisa la cámara al inicio sin imprimir textos, manteniendo el secreto"""
-    global nivel_acceso
+    # 1. Intentar acceder a la cámara con el modelo biométrico ligero
     if os.path.exists("modelo_facial.yml"):
+        print("📷 Cámara detectada y modelo encontrado. Analizando rostro...")
+        reconocedor = cv2.face.LBPHFaceRecognizer_create()
+        reconocedor.read("modelo_facial.yml")
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        cap = cv2.VideoCapture(0)
+        ret, frame = cap.read()
+        cap.release()
+        
+        if ret:
+            gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            rostros = face_cascade.detectMultiScale(gris, 1.3, 5)
+            
+            for (x, y, w, h) in rostros:
+                rostro_recortado = gris[y:y+h, x:x+w]
+                id_usuario, confianza = reconocedor.predict(rostro_recortado)
+                
+                # Si la confianza es menor a 70, es una buena coincidencia
+                if id_usuario == 1 and confianza < 70:
+                    print("✅ Rostro reconocido. ¡Hola MAOAZAking, en qué puedo ayudarte!")
+                    nivel_acceso = "admin"
+                    return
+    else:
+        print("⚠️ No se encontró 'modelo_facial.yml' en el sistema, omitiendo cámara...")
+
+    # 2. Modo espera de teclado (si no hay cámara o falló el reconocimiento)
+    print("⚠️ Validación biométrica fallida o sin cámara.")
+    print("⏳ Tienes 10 segundos para ingresar la anulación manual (Ctrl + Windows + AltGr + A)...")
+    
+    tiempo_inicio = time.time()
+    teclas_presionadas = False
+    
+    while time.time() - tiempo_inicio < 10:
+        if keyboard.is_pressed('ctrl+windows+alt gr+a'):
+            teclas_presionadas = True
+            break
+        time.sleep(0.1)
+        
+    if teclas_presionadas:
+        usuario = input("Usuario: ")
+        password = getpass.getpass("Contraseña: ") 
+        
+        # Cambia "TuContraseñaSecreta" por la que quieras
+        if usuario == "MAOAZAking" and password == "TuContraseñaSecreta":
+            print("✅ Credenciales aceptadas. ¡Hola MAOAZAking!")
+            nivel_acceso = "admin"
+            return
+            
+    # 3. Modo Invitado
+    print("❌ Acceso denegado. Entrando en MODO INVITADO.")
+    print("ATH1: ¿En qué puedo ayudarle?")
+    nivel_acceso = "invitado"
+    
+# Variables globales de estado
+nivel_acceso = "invitado" # Por defecto nadie tiene permisos
+
+# Envolvemos keyboard en un try-except por si se ejecuta sin permisos de Administrador
+try:
+    import keyboard
+    teclado_disponible = True
+except ImportError:
+    teclado_disponible = False
+
+def verificar_seguridad():
+    print("🔒 Iniciando protocolos de seguridad ATH1...")
+    
+    # 1. Validación Biométrica con OpenCV Ligero
+    if os.path.exists("modelo_facial.yml"):
+        print("📷 Cámara detectada. Analizando rostro...")
         try:
             reconocedor = cv2.face.LBPHFaceRecognizer_create()
             reconocedor.read("modelo_facial.yml")
@@ -90,37 +132,53 @@ def escaneo_facial_silencioso():
                     rostro_recortado = gris[y:y+h, x:x+w]
                     id_usuario, confianza = reconocedor.predict(rostro_recortado)
                     if id_usuario == 1 and confianza < 70:
-                        nivel_acceso = "admin"
-        except Exception:
-            pass
-
-def main():
-    global nivel_acceso
-    
-    # 1. Intentar el escaneo fantasma al iniciar
-    escaneo_facial_silencioso()
-    
-    print("=" * 55)
-    print("  🤖  ASISTENTE DE INTELIGENCIA ARTIFICIAL ATH1 ACTIVADO")
-    print("  🎤  Escuchando tu huella geométrica para despertar... (Ctrl+C para salir)")
-    print("=" * 55)
-    
-    if nivel_acceso == "admin":
-        print("[SISTEMA] ✅ Sesión iniciada como Administrador (MAOAZAking).")
+                        print("✅ Rostro reconocido. ¡Hola MAOAZAking, en qué puedo ayudarte!")
+                        return "admin"
+        except Exception as e:
+            print(f"⚠️ Error en lectura de cámara: {e}")
     else:
-        print("[SISTEMA] ⚠️ MODO INVITADO. Funciones restringidas. (Presione Ctrl+Shift+F1 para desbloquear)")
+        print("⚠️ No se encontró 'modelo_facial.yml'.")
 
-    # ─── CARGA DE HUELLAS ACÚSTICAS ───
-    huellas_templates = []
-    if os.path.exists("ath1_voice_templates.json"):
-        with open("ath1_voice_templates.json", "r") as f:
-            try:
-                huellas_templates = [np.array(t) for t in json.load(f)]
-                print(f"📦 Se han cargado {len(huellas_templates)} patrones acústicos de activación.")
-            except Exception as e:
-                pass
-                
-# ... AQUÍ CONTINÚA EL RESTO DE TU CÓDIGO NORMAL (asistente_activo, try, get_vosk_model, etc.)
+    # 2. Validación de Teclado Manual
+    print("⚠️ Validación biométrica fallida.")
+    
+    if teclado_disponible:
+        print("⏳ Tienes 10 segundos para ingresar el código maestro (Ctrl+Windows+AltGr+A)...")
+        tiempo_inicio = time.time()
+        teclas_presionadas = False
+        
+        try:
+            while time.time() - tiempo_inicio < 10:
+                if keyboard.is_pressed('ctrl+windows+alt gr+a'):
+                    teclas_presionadas = True
+                    break
+                time.sleep(0.1)
+        except Exception as e:
+            print("⚠️ Permisos de administrador insuficientes para leer combinaciones secretas en este PC.")
+            teclas_presionadas = False
+    else:
+        teclas_presionadas = False
+
+    # Si se presionaron las teclas, pedir contraseña
+    if teclas_presionadas:
+        usuario = input("\nUsuario: ")
+        password = getpass.getpass("Contraseña: ") 
+        if usuario == "MAOAZAking" and password == "TuContraseñaSecreta":
+            print("✅ Credenciales aceptadas. ¡Bienvenido de nuevo, creador!")
+            return "admin"
+            
+    # 3. Modo Invitado
+    print("\n❌ ACCESO DENEGADO. MODO INVITADO ACTIVADO.")
+    print("ATH1: Operando con funciones restringidas. ¿En qué puedo ayudarle?")
+    return "invitado"
+# --- LÓGICA DE BLOQUEO EN EL CEREBRO ---
+# En tu función procesar_peticion(), al inicio debes poner:
+# if nivel_acceso == "invitado":
+#     if any(x in peticion for x in ["hora", "fecha", "creador", "apágate"]):
+#         # Responder solo eso
+#     else:
+#         return "Lo siento, soy ATH1, creado por MAOAZAking, y mi acceso está restringido en este dispositivo."
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  Configuración
 # ──────────────────────────────────────────────────────────────────────────────
