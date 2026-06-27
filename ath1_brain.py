@@ -400,9 +400,17 @@ def ejecutar_accion_sistema(query: str) -> str:
     if "youtube" in q or "yutub" in q:
         # Caso A: Buscar y reproducir algo nuevo
         if any(x in q for x in ["busca", "reproduce", "pon"]):
-            termino = q.replace("reproduce", "").replace("en youtube", "").replace("youtube", "").replace("yutub", "").replace("busca", "").replace("tú y", "").replace("entra el primer video", "").strip()
-            url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(termino)}"
-            webbrowser.open(url)
+            # 1. Limpiamos conectores comunes de forma segura y exacta
+            termino = q
+            for palabra_eliminar in ["en youtube", "en yutub", "youtube", "yutub", "reproduce", "busca", "pon", "tú y", "entra el primer video"]:
+                termino = termino.replace(palabra_eliminar, "")
+            
+            # 2. Eliminamos espacios dobles o sueltos al inicio/final
+            termino = " ".join(termino.split()).strip()
+            
+            # 3. Control de seguridad: Si por error quedó vacío, asignamos algo seguro
+            if not termino:
+                termino = "musica cristiana"
             
             # Automatización: Esperar carga y dar Enter al primer video
             print("⏳ Se esta abriendo YouTube, por favor espera...")
