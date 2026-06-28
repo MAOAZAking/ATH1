@@ -288,14 +288,9 @@ def procesar_orden():
                 #if respuesta == "APAGANDO_SISTEMA":
                 if "APAGANDO_SISTEMA" in respuesta:
                     if nivel_acceso == "admin":
-                        hablar("Hasta luego MAOAZAking, que tengas un buen día.")
-                        sys.exit(0) # Esto mata el proceso y cierra el programa
-                        os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
+                        hablar("Hasta luego MAOAZAking, que tengas un buen día."), sys.exit(0), os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
                     else:
-                        hablar("Adiós.")
-                        sys.exit(0) # Esto mata el proceso y cierra el programa
-                        os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
-                    #os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
+                        hablar("Adiós."), sys.exit(0), os._exit(0)
                 hablar(respuesta)
             else:
                 hablar("No logré comprender tu petición.")

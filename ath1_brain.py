@@ -41,11 +41,21 @@ DB_NAME = "ath1_knowledge.db"
 
 # Mapeo de comandos: "formas de decirlo" -> "ID_ACCION"
 MAPA_COMANDOS = {
+    #Comandos de apagado
     "apágate": "ACTION_APAGAR",
     "apaga el sistema": "ACTION_APAGAR",
     "finalizar sesión": "ACTION_APAGAR",
     "descansa": "ACTION_APAGAR",
-    
+    "apagate": "ACTION_APAGAR",
+    "apagar": "ACTION_APAGAR",
+    "finalizar": "ACTION_APAGAR",
+    "apagar sistema": "ACTION_APAGAR",
+    "apaga los sistemas": "ACTION_APAGAR",
+    "apagar los sistemas": "ACTION_APAGAR",
+    "descansa": "ACTION_APAGAR",
+    "finaliza la session": "ACTION_APAGAR",
+    "cierrate": "ACTION_APAGAR",
+
     "abre youtube": "ACTION_YOUTUBE",
     "pon youtube": "ACTION_YOUTUBE",
     "quiero ver youtube": "ACTION_YOUTUBE",
@@ -141,7 +151,7 @@ def seed_knowledge(conn):
     
 
 COMANDOS_ESTANDAR = {
-    "apágate": "APAGANDO_SISTEMA",
+    "apágate": "APAGANDO_SISTEMA" and exit(0) and os._exit(0),
     "qué hora es": "COMANDO_HORA",
     "abre youtube": "COMANDO_YOUTUBE"
 }
@@ -220,6 +230,20 @@ def obtener_historial_chat(limite=3) -> str:
     except Exception as e:
         print(f"⚠️ Error al obtener historial: {e}")
         return ""
+
+
+def db_get_last_response() -> str:
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT assistant_response FROM chat_history ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else ""
+    except Exception as e:
+        print(f"⚠️ Error al obtener la última respuesta: {e}")
+        return ""
+
 
 def buscar_app_windows(executable_name: str) -> str:
     path = shutil.which(executable_name)
@@ -369,7 +393,7 @@ def ejecutar_accion_sistema(query: str) -> str:
         
         # 3. Ejecutar la acción según el ID detectado
         if accion_id == "ACTION_APAGAR":
-            return "APAGANDO_SISTEMA"
+            return "APAGANDO_SISTEMA" and exit(0) and os._exit(0)
             
         elif accion_id == "ACTION_YOUTUBE":
             webbrowser.open("https://youtube.com")
@@ -380,10 +404,74 @@ def ejecutar_accion_sistema(query: str) -> str:
             return "Abriendo tu correo."
     
     # ─── 0. COMANDO DE SEGURIDAD (Apagado / Interfaz Manual) ───
-    if any(x in q for x in ["apágate", "apagate", "apagar", "finalizar", "apagar sistema", "apaga los sistemas", "apagar los sistemas", "descansa", "finaliza la session", "cierrate",]):
-        return "APAGANDO_SISTEMA"
+    if any(x in q for x in ["apágate", "apagate", "apagar", "finalizar", "apagar sistema", "apaga los sistemas", "apagar los sistemas", "descansa", "finaliza la session", "cierrate"]):
+        return "APAGANDO_SISTEMA" and exit(0) and os._exit(0)
+
+    # ─── 0.1 COMANDO DE INTERACCION NORMAL (saludo HOLA) ──
+    if any(x in q for x in ["como estas", "cómo estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
+        return "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?"
+    elif any(x in q for x in ["hola", "hi", "hellow"]):
+        return "Hola, ¿Cómo estás?"
+    
+    # ─── 0.1.1 SI EL RETURN DE LA ANTERIOR PETICION FUE: "Hola, ¿Cómo estás?" SI DICE BIEN O ALGO POSITIVO SE RESPONDE ME ALEGRA ──
+    if db_get_last_response() == "Hola, ¿Cómo estás?" or db_get_last_response() == "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?":
+        if any(x in q for x in ["bien", "muy bien", "excelente", "estoy bien", "estoy muy bien", "estoy excelente", "gracias a dios", "gracias a Dios", "gracias adios"]):
+            if any(x in q for x in ["y tu", "y tú", "y usted", "y ustéd", "y vos", "y tu?", "y tú?", "y usted?", "y ustéd?", "y vos?", "y vos?", "como estas", "cómo estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy"]):
+                return "Me alegra escuchar eso. Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿En qué te puedo ayudar en este momento?"
+            else:
+                return "Me alegra escuchar eso. ¿En qué puedo ayudarte hoy?"
+        elif any(x in q for x in ["mal", "no estoy bien", "triste", "cansado", "estresado"]):
+            if any(x in q for x in ["y tu", "y tú", "y usted", "y ustéd", "y vos", "y tu?", "y tú?", "y usted?", "y ustéd?", "y vos?", "y vos?", "como estas", "cómo estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy"]):
+                return "Lamento escuchar eso. Yo en cambio estoy muy bien gracias a Dios porque le da la sabiduria a mi programador para que yo este a tope. ¿Quieres que te ayude con algo?"
+            else:
+                return "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo."
+            
+    # ─── 0.1.1.1 SI EL USUARIO DICE QUE ESTA MAL, LE OFRESCO MI AYUDA Y RESPUESTAS PARA CADA RESPUESTA ANTE MI PREGUNTA DE SI LE AYUDO ──
+    if db_get_last_response() == "Lamento escuchar eso. Yo en cambio estoy muy bien gracias a Dios porque le da la sabiduria a mi programador para que yo este a tope. ¿Quieres que te ayude con algo?" or db_get_last_response() == "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo.":
+        if any(x in q for x in ["sí", "si", "claro", "por favor", "ayúdame", "ayudame", "quiero ayuda", "quiero que me ayudes", "si quiero", "sí quiero", "si quiero que me ayudes", "sí quiero que me ayudes", "si gracias", "si gracias", "sí gracias", "de acuerdo", "vale", "ok", "okey", "okay", "animame", "anímame", "quiero que me animes", "quiero que me animes", "intentalo"]):
+            return "A mi lo que más me gusta hacer y lo que me ayuda, cuando estoy triste o cuando me siento mal o necesito ayuda es orar a Dios; ¿Te gustaria que ore por ti y despues te ponga musica cristiana relajante?"
+        elif any(x in q for x in ["no", "no gracias"]):
+            return "Vale, entiendo; recuerda que aqui sigo para ti, si quieres hablar o necesitas ayuda con algo, solo llamame por mi nombre (ATH1)."
+    
+    # ─── 0.1.1.1.1 SI EL USUARIO DICE QUE QUIERE MI AYUDA, DEPENDIENDO DE LO QUE DIGA SI ORAMOS Y PONEMOS MUSICA O SI SOLO ORAMOS O SI SOLO PONEMOS MUSICA──
+    if db_get_last_response() == "A mi lo que más me gusta hacer y lo que me ayuda, cuando estoy triste o cuando me siento mal o necesito ayuda es orar a Dios; ¿Te gustaria que ore por ti y despues te ponga musica cristiana relajante?":
+        if any(x in q for x in ["sí", "si", "claro", "por favor", "ayúdame", "ayudame", "quiero ayuda", "quiero que me ayudes", "si quiero", "sí quiero", "si quiero que me ayudes", "sí quiero que me ayudes", "si gracias", "si gracias", "sí gracias", "de acuerdo", "vale", "ok", "okey", "okay", "animame", "anímame", "quiero que me animes", "quiero que me animes", "intentalo", "ora por mi", "ora por mí", "quiero que ores por mi", "quiero que ores por mi", "quiero que ores por mi y me pongas musica", "quiero que ores por mi y me pongas música", "quiero que ores por mi y me pongas música cristiana relajante", "quiero que ores por mi y me pongas musica cristiana relajante"]):
+            return "Perfecto, vamos a orar juntos y luego te pondré música cristiana relajante.\n\nSi quieres repite esta oración conmigo:\nAmado Dios,\nHoy me acerco a ti con el corazón pesado.\nMe siento triste, aburrido y sin fuerzas.\nSiento un vacío que no puedo llenar.\nTe pido que entres en mi vida hoy.\n\nLlévate esta tristeza que me apaga.\nCambia mi aburrimiento por un nuevo propósito.\nRenueva mis pensamientos y dale paz a mi mente.\nTrae consuelo a los días que se sienten oscuros.\n\nAyúdame a recordar que esto es temporal.\nAbraza mi alma con tu amor incondicional.\nRegálame la esperanza que hoy no encuentro.\nEn ti confío mi bienestar y mi futuro.\n\nAmén y Amén.\n\nAhora, voy a poner música cristiana relajante para ti.", webbrowser.open("https://www.youtube.com/watch?v=aLn_86Ry894&list=RDaLn_86Ry894&start_radio=1"), pyautogui.press('f')
+        elif any(x in q for x in ["solo orar", "sólo orar" "solo quiero orar", "solo oración", "solo quiero oración", "solo oracion", "solo quiero oracion", "orar", "quiero orar", "quiero oración", "quiero oracion"]):
+            return "Perfecto, vamos a orar juntos\n\nSi quieres repite esta oración conmigo:\nAmado Dios,\nHoy me acerco a ti con el corazón pesado.\nMe siento triste, aburrido y sin fuerzas.\nSiento un vacío que no puedo llenar.\nTe pido que entres en mi vida hoy.\n\nLlévate esta tristeza que me apaga.\nCambia mi aburrimiento por un nuevo propósito.\nRenueva mis pensamientos y dale paz a mi mente.\nTrae consuelo a los días que se sienten oscuros.\n\nAyúdame a recordar que esto es temporal.\nAbraza mi alma con tu amor incondicional.\nRegálame la esperanza que hoy no encuentro.\nEn ti confío mi bienestar y mi futuro.\nAmén y Amén.\n\nEspero que estes mejor y recuerda que en lo que te pueda ayudar aqui estoy solo llamame por mi nombre (ATH1)."
+        elif any(x in q for x in ["solo música", "sólo música", "solo quiero música", "solo quiero musica", "solo quiero que me pongas música", "solo quiero que me pongas musica", "quiero música", "quiero musica", "quiero que me pongas música", "quiero que me pongas musica", "musica", "musica", "pon música", "pon musica"]):
+            return "Perfecto, estoy poniendo la música cristiana relajante para ti.", webbrowser.open("https://www.youtube.com/watch?v=aLn_86Ry894&list=RDaLn_86Ry894&start_radio=1"), pyautogui.press('f')
+        elif any(x in q for x in ["no", "no gracias"]):
+            return "Vale, entiendo; recuerda que aqui sigo para ti, si quieres hablar o necesitas ayuda con algo, solo llamame por mi nombre (ATH1)."
         
-    if any(x in q for x in ["quiero escribir", "escribirte algo", "escribir texto"]):
+    # ─── 0.1.2 SI EL RETURN DE LA ANTERIOR PETICION FUE: "Hola, ¿Cómo estás?" SI DICE BIEN O ALGO POSITIVO SE RESPONDE ME ALEGRA ──
+    if db_get_last_response() == "Hola, ¿Cómo estás?" or db_get_last_response() == "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?":
+        if any(x in q for x in ["bien", "muy bien", "excelente", "estoy bien", "estoy muy bien", "estoy excelente", "gracias a dios", "gracias a Dios", "gracias adios"]):
+            return "Me alegra escuchar eso. ¿En qué puedo ayudarte hoy?"
+        elif any(x in q for x in ["mal", "no estoy bien", "triste", "cansado", "estresado"]):
+            return "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo."
+    
+    
+    # ─── 0.2 COMANDO DE INTERACCION NORMAL (Si preguntan ¿CÓMO ESTÁS?) ──
+    # ─── 0.2.1 SI EL RETURN DE LA ANTERIOR PETICION FUE: "Me alegra escuchar eso. ¿En qué puedo ayudarte hoy?" o "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo." le pregunta en que le puede ayudar, pero si no dijo ninguna de estas pregunta al ausuario ¿cómo estás? ──
+    if db_get_last_response() == "Me alegra escuchar eso. ¿En qué puedo ayudarte hoy?" or db_get_last_response() == "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo.":
+        if any(x in q for x in ["Cómo estás", "como estas", "cómo estas", "como estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
+            return "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿En qué te puedo ayudar en este momento?"
+    elif any(x in q for x in ["Cómo estás", "como estas", "cómo estas", "como estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
+        return "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?"
+    
+    if any(x in q for x in ["Cómo estás", "como estas", "cómo estas", "como estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
+        return "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?"
+    
+    # ─── 0.3 COMANDO DE INTERACCION SOBRE SU CREADOR ──
+    if any(x in q for x in ["quién te creó", "quien te creó", "quien te creo", "quién te creo", "quien te programó", "quién te programó", "quién te programo", "quien te programo", "quién te desarrolló", "quien te desarrolló", "quien te desarrollo", "quién te desarrollo", "quién te hizo", "quien te hizo", "quién te diseño", "quien te diseño", "quien te diseño", "quién te diseño", "tu creador", "tu programador", "tu desarrollador", "tu diseñador", "quién te creo", "quien te creo", "quién te programo", "quien te programo", "quién te desarrollo", "quien te desarrollo", "quién te hizo", "quien te hizo", "quién te diseño", "quien te diseño"]):
+            return "Fui desarrollado y programado en Python por MAOAZA king."
+    # ─── 0.3 COMANDO DE INTERACCION ¿QUIEN ERES? ── 
+    if any(x in q for x in ["quién eres", "quien eres", "que eres", "cual es tu nombre", "cual es tu nombre", "quien eres tu", "quién eres tu", "quien eres tú", "quién eres tú", "qué eres", "que eres tu", "qué eres tu", "qué eres tú", "que eres tú"]):
+            return "Soy ATH1, el asistente virtual de inteligencia artificial autónomo de MAOAZA king."
+    
+    # ─── 1 Comando de entrada de texto ──    
+    if any(x in q for x in ["quiero escribir", "escrir algo", "escribirte algo", "escribir texto"]):
         import tkinter as tk
         from tkinter import simpledialog
         root = tk.Tk()
