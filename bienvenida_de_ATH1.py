@@ -283,14 +283,19 @@ def procesar_orden():
             texto = transcribir_audio(wav_io)
             if texto.strip():
                 respuesta = ath1_brain.procesar_peticion(texto, nivel_acceso)
+                respuesta_limpia = str(respuesta).strip().upper()
                 
                 # Capturar orden de apagado
-                #if respuesta == "APAGANDO_SISTEMA":
-                if "APAGANDO_SISTEMA" in respuesta:
+                if "APAGANDO_SISTEMA" in respuesta_limpia:
                     if nivel_acceso == "admin":
-                        hablar("Hasta luego MAOAZAking, que tengas un buen día."), sys.exit(0), os._exit(0) # os._exit cierra todos los hilos forzosamente, mejor que sys.exit
+                        hablar("Hasta luego MAOAZAking, que tengas un buen día.")
                     else:
-                        hablar("Adiós."), sys.exit(0), os._exit(0)
+                        hablar("Adiós.")  # Ahora sí está separado para no-administradores
+                    
+                    import os
+                    os._exit(0)  # Cierra todo de forma fulminante tras hablar
+                
+                # Si no es apagado, dice la respuesta normal del cerebro
                 hablar(respuesta)
             else:
                 hablar("No logré comprender tu petición.")
@@ -299,6 +304,7 @@ def procesar_orden():
     except Exception as e:
         print(f"⚠️ Error en secuencia: {e}")
         hablar("Lo siento, se ha producido un error interno.")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  Llamar a TTS (Text-to-Speech)

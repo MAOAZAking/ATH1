@@ -32,6 +32,7 @@ from google.genai import types
 from dotenv import load_dotenv
 
 ################### IMPORTACION DE SELENIUM PARA YOUTUBE EL PRIMER VIDEO ###################
+import urllib.parse
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -151,7 +152,7 @@ def seed_knowledge(conn):
     
 
 COMANDOS_ESTANDAR = {
-    "apágate": "APAGANDO_SISTEMA" and exit(0) and os._exit(0),
+    "apágate": "APAGANDO_SISTEMA",
     "qué hora es": "COMANDO_HORA",
     "abre youtube": "COMANDO_YOUTUBE"
 }
@@ -161,8 +162,13 @@ def interpretar_intencion(texto_transcrito):
     coincidencias = difflib.get_close_matches(texto_transcrito.lower(), COMANDOS_ESTANDAR.keys(), n=1, cutoff=0.8)
     
     if coincidencias:
-        comando_real = coincidencias[0]
-        return COMANDOS_ESTANDAR[comando_real]
+        comando_detectado = coincidencias[0]
+        accion_id = MAPA_COMANDOS[comando_detectado]
+        print(f"DEBUG: Interpreté {q} como {comando_detectado} -> Ejecutando: {accion_id}")
+        
+        # 3. Ejecutar la acción según el ID detectado
+        if accion_id == "ACTION_APAGAR":
+            return "APAGANDO_SISTEMA"  # El cerebro solo retorna este texto plano
     return None
 # ──────────────────────────────────────────────────────────────────────────────
 #  Búsqueda de Conocimiento Local y Memoria
@@ -349,23 +355,29 @@ def buscar_y_ejecutar_comando_dinamico(query: str) -> str:
 def buscar_y_reproducir_selenium(termino_busqueda: str):
     """Abre Chrome usando el gestor nativo de Selenium, busca y reproduce el primer video."""
     options = webdriver.ChromeOptions()
-    # Mantiene la ventana de Chrome abierta tras finalizar la función
-    options.add_experimental_option("detach", True) 
     
-    # Selenium detecta tu Chrome e instala el driver automáticamente sin código extra
+    # Mantiene la ventana de Chrome abierta tras finalizar la función
+    options.add_experimental_option("detach", True)
+    
+    # Selenium detecta tu Chrome y maneja el driver automáticamente
     driver = webdriver.Chrome(options=options)
     
-    url = f"https://youtube.com{urllib.parse.quote(termino_busqueda)}"
+    # Se añade "/results?search_query=" para que YouTube ejecute la búsqueda correctamente
+    url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(termino_busqueda)}"
     driver.get(url)
     
     try:
-        # Espera hasta 10 segundos a que aparezca el primer video real
+        # Espera hasta 10 segundos a que los resultados de búsqueda estén listos
         esperar = WebDriverWait(driver, 10)
+        
+        # Selector CSS corregido para hacer clic en el título del primer video
         primer_video = esperar.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "ytd-video-renderer #video-title"))
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "a#video-title"))
         )
+        
         primer_video.click()
         print("DEBUG: Video localizado y reproducido con Selenium Nativo.")
+        
     except Exception as e:
         print(f"DEBUG: No se pudo hacer clic en el video. Error: {e}")
 # ──────────────────────────────────────────────────────────────────────────────
@@ -393,7 +405,7 @@ def ejecutar_accion_sistema(query: str) -> str:
         
         # 3. Ejecutar la acción según el ID detectado
         if accion_id == "ACTION_APAGAR":
-            return "APAGANDO_SISTEMA" and exit(0) and os._exit(0)
+            return "APAGANDO_SISTEMA"
             
         elif accion_id == "ACTION_YOUTUBE":
             webbrowser.open("https://youtube.com")
@@ -405,7 +417,7 @@ def ejecutar_accion_sistema(query: str) -> str:
     
     # ─── 0. COMANDO DE SEGURIDAD (Apagado / Interfaz Manual) ───
     if any(x in q for x in ["apágate", "apagate", "apagar", "finalizar", "apagar sistema", "apaga los sistemas", "apagar los sistemas", "descansa", "finaliza la session", "cierrate"]):
-        return "APAGANDO_SISTEMA" and exit(0) and os._exit(0)
+        return "APAGANDO_SISTEMA"
 
     # ─── 0.1 COMANDO DE INTERACCION NORMAL (saludo HOLA) ──
     if any(x in q for x in ["como estas", "cómo estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
@@ -486,22 +498,28 @@ def ejecutar_accion_sistema(query: str) -> str:
     
     # ─── 1. CONTROL TOTAL DE YOUTUBE Y REPRODUCTOR ───
     if "youtube" in q or "yutub" in q:
-        # Caso A: Buscar y reproducir algo nuevo
-        if any(x in q for x in ["busca", "reproduce", "pon"]):
-            # 1. Limpiamos conectores comunes de forma segura y exacta
+        if any(x in q for x in ["busca", "reproduce", "pon", "abre"]):
             termino = q
-            for palabra_eliminar in ["en youtube", "en yutub", "youtube", "yutub", "reproduce", "busca", "pon", "tú y", "entra el primer video"]:
-                termino = termino.replace(palabra_eliminar, "")
             
-            # 2. Eliminamos espacios dobles o sueltos al inicio/final
+            # Lista limpia sin espacios manuales. \b se encarga de aislar la palabra de forma nativa.
+            palabras_eliminar = [
+                r"en youtube", r"en yutub", r"youtube", r"yutub", 
+                r"reproduce", r"busca", r"ponme", r"pon", r"tú y", 
+                r"entra el primer video", r"abre", r"y", r"de"
+            ]
+            
+            for palabra in palabras_eliminar:
+                # \b detecta los límites de la palabra automáticamente, sin importar si hay espacios o inicio de cadena
+                termino = re.sub(rf'\b{palabra}\b', '', termino, flags=re.IGNORECASE)
+            
+            # Elimina espacios múltiples internos y limpia extremos
             termino = " ".join(termino.split()).strip()
             
-            # 3. Control de seguridad: Si por error quedó vacío, asignamos algo seguro
             if not termino:
                 termino = "musica cristiana"
-            
-            # Automatización: Esperar carga y dar Enter al primer video
-            print("⏳ Se esta abriendo YouTube, por favor espera...")
+                
+            print(f"DEBUG: Término final limpio enviado a YouTube: '{termino}'")
+            print("⏳ Se está abriendo YouTube, por favor espera...")
             buscar_y_reproducir_selenium(termino)
             return f"He buscado '{termino}' en YouTube e intenté reproducir el primer video."
         
@@ -731,9 +749,9 @@ def procesar_peticion(peticion: str, nivel_acceso: str = "admin") -> str:
             
         # Si preguntó por su creador, responde en seco
         if any(x in q_min for x in ["creador", "quien eres", "quién eres", "que eres", "quién te creó", "quien te creó", "quien te creo"]):
-            return "Fui desarrollado y programado en Python por MAOAZAking. Soy su asistente virtual y motor analítico personal."
+            return "Fui desarrollado y programado en Python por MAOAZA king. Soy su asistente virtual y motor analítico personal."
 
-    # ─── FLUJO NORMAL PARA EL ADMINISTRADOR (MAOAZAking) ───
+    # ─── FLUJO NORMAL PARA EL ADMINISTRADOR (MAOAZA king) ───
     # A partir de aquí, el código fluye normal porque pasó el filtro o es admin
     
     # ─── 1. BUSCAR EN MEMORIA DINÁMICA (Prioridad Alta) ───
@@ -768,7 +786,7 @@ def procesar_peticion(peticion: str, nivel_acceso: str = "admin") -> str:
         try:
             client = genai.Client(api_key=api_key)
             
-            prompt = f"""Eres ATH1, el asistente virtual autónomo de MAOAZAking. Tienes acceso a internet.
+            prompt = f"""Eres ATH1, el asistente virtual autónomo de MAOAZA king. Tienes acceso a internet.
 
 CONOCIMIENTO LOCAL DEL USUARIO:
 {contexto_local}
