@@ -38,40 +38,55 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-############################################ PRUEBA DE COSA A COSA EN HABALR Y DESPUES MOSTRAR ######
-import pyttsx3
-engine = pyttsx3.init()
-######################################################################################################
-
 
 DB_NAME = "ath1_knowledge.db"
 
 # Mapeo de comandos: "formas de decirlo" -> "ID_ACCION"
 MAPA_COMANDOS = {
     #Comandos de apagado
-    "apágate": "ACTION_APAGAR",
-    "apaga el sistema": "ACTION_APAGAR",
-    "finalizar sesión": "ACTION_APAGAR",
-    "descansa": "ACTION_APAGAR",
-    "apagate": "ACTION_APAGAR",
-    "apagar": "ACTION_APAGAR",
-    "finalizar": "ACTION_APAGAR",
-    "apagar sistema": "ACTION_APAGAR",
-    "apaga los sistemas": "ACTION_APAGAR",
-    "apagar los sistemas": "ACTION_APAGAR",
-    "descansa": "ACTION_APAGAR",
-    "finaliza la session": "ACTION_APAGAR",
-    "cierrate": "ACTION_APAGAR",
-
-    "abre youtube": "ACTION_YOUTUBE",
-    "pon youtube": "ACTION_YOUTUBE",
-    "quiero ver youtube": "ACTION_YOUTUBE",
+    "apágate": "COMANDO_APAGAR",
+    "apaga el sistema": "COMANDO_APAGAR",
+    "finalizar sesión": "COMANDO_APAGAR",
+    "descansa": "COMANDO_APAGAR",
+    "apagate": "COMANDO_APAGAR",
+    "apagar": "COMANDO_APAGAR",
+    "finalizar": "COMANDO_APAGAR",
+    "apagar sistema": "COMANDO_APAGAR",
+    "apaga los sistemas": "COMANDO_APAGAR",
+    "apagar los sistemas": "COMANDO_APAGAR",
+    "descansa": "COMANDO_APAGAR",
+    "finaliza la session": "COMANDO_APAGAR",
+    "cierrate": "COMANDO_APAGAR",
     
-    "abre gmail": "ACTION_GMAIL",
-    "revisa mi correo": "ACTION_GMAIL",
+    "qué hora es": "COMANDO_HORA",
     
-    "sube el volumen": "ACTION_VOLUMEN_UP",
-    "más volumen": "ACTION_VOLUMEN_UP"
+    #Estoy mal
+    "estoy mal": "COMANDO_ESTOY_MAL",
+    "me siento mal": "COMANDO_ESTOY_MAL",
+    "siento mal": "COMANDO_ESTOY_MAL",
+    "no estoy bien": "COMANDO_ESTOY_MAL",
+    "triste": "COMANDO_ESTOY_MAL",
+    "cansado": "COMANDO_ESTOY_MAL",
+    
+    #Glorai a Dios
+    "gloria a dios": "COMANDO_GLORIA_A_DIOS",
+    "gracias a dios": "COMANDO_GLORIA_A_DIOS",
+    "a dios": "COMANDO_GLORIA_A_DIOS",
+    
+    #Comandos de YouTube
+    "abre youtube": "COMANDO_YOUTUBE",
+    "pon youtube": "COMANDO_YOUTUBE",
+    "quiero ver youtube": "COMANDO_YOUTUBE",
+    
+    #Comandos de Gmail
+    "abre gmail": "COMANDO_GMAIL",
+    "revisa mi correo": "COMANDO_GMAIL",
+    
+    #Comandos de Volumen
+    "sube el volumen": "COMANDO_VOLUMEN_UP",
+    "más volumen": "COMANDO_VOLUMEN_UP",
+    "gloria a dios": "COMANDO_GLORIA_A_DIOS",
+    "triste": "COMANDO_ESTOY_MAL",
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -157,25 +172,51 @@ def seed_knowledge(conn):
     print(f"✅ Se insertaron {len(knowledge_data)} registros de conocimiento inicial.")
     
 
-COMANDOS_ESTANDAR = {
-    "apágate": "APAGANDO_SISTEMA",
-    "qué hora es": "COMANDO_HORA",
-    "abre youtube": "COMANDO_YOUTUBE"
-}
+# COMANDOS_ESTANDAR = {
+#     "COMANDO_APAGAR": "APAGANDO_SISTEMA",
 
-def interpretar_intencion(texto_transcrito):
-    # Intenta encontrar una coincidencia aproximada (80% de similitud)
-    coincidencias = difflib.get_close_matches(texto_transcrito.lower(), COMANDOS_ESTANDAR.keys(), n=1, cutoff=0.8)
+#     "COMANDO_HORA": "ACTION_HORA",
     
-    if coincidencias:
-        comando_detectado = coincidencias[0]
-        accion_id = MAPA_COMANDOS[comando_detectado]
-        print(f"DEBUG: Interpreté {q} como {comando_detectado} -> Ejecutando: {accion_id}")
+#     #Estoy mal
+#     "COMANDO_ESTOY_MAL": "ACTION_ESTOY_MAL",
+    
+#     #Glorai a Dios
+#     "COMANDO_GLORIA_A_DIOS": "ACTION_GLORIA_A_DIOS",
+    
+#     #Comandos de YouTube
+#     "COMANDO_YOUTUBE": "ACTION_YOUTUBE",
+
+#     "COMANDO_GMAIL": "ACTION_GMAIL",
+    
+#     #Comandos de Volumen
+#     "COMANDO_VOLUMEN_UP": "ACTION_VOLUMEN_UP"
+# }
+
+# def interpretar_intencion(texto_transcrito):
+#     # Intenta encontrar una coincidencia aproximada (80% de similitud)
+#     coincidencias = difflib.get_close_matches(texto_transcrito.lower(), COMANDOS_ESTANDAR.keys(), n=1, cutoff=0.8)
+    
+#     if coincidencias:
+#         comando_detectado = coincidencias[0]
+#         accion_id = MAPA_COMANDOS[comando_detectado]
+#         print(f"DEBUG: Interpreté {q} como {comando_detectado} -> Ejecutando: {accion_id}")
         
-        # 3. Ejecutar la acción según el ID detectado
-        if accion_id == "ACTION_APAGAR":
-            return "APAGANDO_SISTEMA"  # El cerebro solo retorna este texto plano
-    return None
+#         # 3. Ejecutar la acción según el ID detectado
+#         if accion_id == "COMANDO_APAGAR":
+#             #devolver texto APAGANDO_SISTEMA y decir en voz alta apagando sistemas con las variables actuales
+#             return "APAGANDO_SISTEMA"
+        
+#         if accion_id == "ACTION_YOUTUBE":
+#             webbrowser.open("https://youtube.com")
+#             return "Abriendo YouTube para ti."
+#         if accion_id == "ACTION_GMAIL":
+#             webbrowser.open("https://mail.google.com")
+#             return "Abriendo tu correo."
+#         if accion_id == "ACTION_GLORIA_A_DIOS":
+#             return ""
+#         if accion_id == "ACTION_ESTOY_MAL":
+#             return "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo."
+#     return None
 # ──────────────────────────────────────────────────────────────────────────────
 #  Búsqueda de Conocimiento Local y Memoria
 # ──────────────────────────────────────────────────────────────────────────────
@@ -397,10 +438,7 @@ def ejecutar_accion_sistema(query: str) -> str:
     q = query.lower().strip()
     
     # 1. Buscar la mejor coincidencia en nuestro mapa
-    # Obtenemos todas las llaves posibles (las frases conocidas)
     posibles_comandos = list(MAPA_COMANDOS.keys())
-    
-    # 2. Fuzzy Matching: Buscamos qué llave se parece más a lo que dijo el usuario
     coincidencias = difflib.get_close_matches(q, posibles_comandos, n=1, cutoff=0.7)
     
     if coincidencias:
@@ -410,16 +448,30 @@ def ejecutar_accion_sistema(query: str) -> str:
         print(f"DEBUG: Interpreté '{q}' como '{comando_detectado}' -> Ejecutando: {accion_id}")
         
         # 3. Ejecutar la acción según el ID detectado
-        if accion_id == "ACTION_APAGAR":
+        if accion_id == "COMANDO_APAGAR":
             return "APAGANDO_SISTEMA"
             
-        elif accion_id == "ACTION_YOUTUBE":
+        elif accion_id == "COMANDO_YOUTUBE":
             webbrowser.open("https://youtube.com")
             return "Abriendo YouTube para ti."
-            
-        elif accion_id == "ACTION_GMAIL":
+        
+        elif accion_id == "COMANDO_GMAIL":
             webbrowser.open("https://mail.google.com")
-            return "Abriendo tu correo."
+            return "Abriendo tu correo electrónico."
+            
+        elif accion_id == "COMANDO_GLORIA_A_DIOS":
+            return "Amén, gloria a Dios."
+            
+        elif accion_id == "COMANDO_ESTOY_MAL":
+            return "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo."
+            
+        elif accion_id == "COMANDO_HORA":
+            ahora = datetime.datetime.now().strftime("%I:%M %p")
+            return f"Son las {ahora}."
+            
+        elif accion_id == "COMANDO_VOLUMEN_UP":
+            pyautogui.press('volumeup', presses=5)
+            return "He subido el volumen."
     
     # ─── 0. COMANDO DE SEGURIDAD (Apagado / Interfaz Manual) ───
     if any(x in q for x in ["apágate", "apagate", "apagar", "finalizar", "apagar sistema", "apaga los sistemas", "apagar los sistemas", "descansa", "finaliza la session", "cierrate"]):
@@ -503,6 +555,8 @@ def ejecutar_accion_sistema(query: str) -> str:
             return procesar_peticion(user_text)
         else:
             return "Se canceló la entrada de texto."
+    
+    
     
     # ─── 1. CONTROL TOTAL DE YOUTUBE Y REPRODUCTOR ───
     if "youtube" in q or "yutub" in q:
@@ -733,7 +787,113 @@ def check_internet() -> bool:
         return True
     except Exception:
         return False
-
+def conversacion_basica(q_min: str, ultimo_mensaje: str) -> str:
+    """Maneja la charla general, saludos y ayudas emocionales para CUALQUIER usuario."""
+    
+    # 1. Identidad
+    if any(x in q_min for x in ["quién te creó", "quien te creó", "quien te creo", "quién te creo", "quien te programó", "quién te programó", "quién te programo", "quien te programo", "quién te desarrolló", "quien te desarrolló", "quien te desarrollo", "quién te desarrollo", "quién te hizo", "quien te hizo", "quién te diseño", "quien te diseño", "quien te diseño", "quién te diseño", "tu creador", "tu programador", "tu desarrollador", "tu diseñador", "quién te creo", "quien te creo", "quién te programo", "quien te programo", "quién te desarrollo", "quien te desarrollo", "quién te hizo", "quien te hizo", "quién te diseño", "quien te diseño", "quién eres", "quien eres", "que eres", "cual es tu nombre", "cual es tu nombre", "quien eres tu", "quién eres tu", "quien eres tú", "quién eres tú", "qué eres", "que eres tu", "qué eres tu", "qué eres tú", "que eres tú"]):
+        if ("quién te creó" in q_min or 
+            "quien te creó" in q_min or 
+            "quien te creo" in q_min or 
+            "quién te creo" in q_min or 
+            "quien te programó" in q_min or 
+            "quién te programó" in q_min or 
+            "quién te programo" in q_min or 
+            "quien te programo" in q_min or 
+            "quién te desarrolló" in q_min or 
+            "quien te desarrolló" in q_min or 
+            "quien te desarrollo" in q_min or 
+            "quién te desarrollo" in q_min or 
+            "quién te hizo" in q_min or 
+            "quien te hizo" in q_min or 
+            "quién te diseño" in q_min or 
+            "quien te diseño" in q_min or 
+            "quien te diseño" in q_min or 
+            "quién te diseño" in q_min or 
+            "tu creador" in q_min or 
+            "tu programador" in q_min or 
+            "tu desarrollador" in q_min or 
+            "tu diseñador" in q_min or 
+            "quién te creo" in q_min or 
+            "quien te creo" in q_min or 
+            "quién te programo" in q_min or 
+            "quien te programo" in q_min or 
+            "quién te desarrollo" in q_min or 
+            "quien te desarrollo" in q_min or 
+            "quién te hizo" in q_min or 
+            "quien te hizo" in q_min or 
+            "quién te diseño" in q_min or 
+            "quien te diseño" in q_min):
+            return "Fui desarrollado y programado en Python por MAOAZA king."
+        else:
+            return "Soy ATH1, el asistente virtual con inteligencia artificial de MAOAZA king."
+        
+    # 2. Saludos
+    if any(x in q_min for x in ["como estas", "cómo estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
+        return "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?"
+    elif any(x in q_min for x in ["hola", "hi", "hellow"]):
+        return "Hola, ¿Cómo estás?"
+    
+    # 2.1 SI EL RETURN DE LA ANTERIOR PETICION FUE: "Hola, ¿Cómo estás?" SI DICE BIEN O ALGO POSITIVO SE RESPONDE ME ALEGRA ──
+    if db_get_last_response() == "Hola, ¿Cómo estás?" or db_get_last_response() == "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?":
+        if any(x in q_min for x in ["bien", "muy bien", "excelente", "estoy bien", "estoy muy bien", "estoy excelente", "gracias a dios", "gracias a Dios", "gracias adios"]):
+            if any(x in q_min for x in ["y tu", "y tú", "y usted", "y ustéd", "y vos", "y tu?", "y tú?", "y usted?", "y ustéd?", "y vos?", "y vos?", "como estas", "cómo estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy"]):
+                return "Me alegra escuchar eso. Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿En qué te puedo ayudar en este momento?"
+            else:
+                return "Me alegra escuchar eso. ¿En qué puedo ayudarte hoy?"
+        elif any(x in q_min for x in ["mal", "no estoy bien", "triste", "cansado", "estresado"]):
+            if any(x in q_min for x in ["y tu", "y tú", "y usted", "y ustéd", "y vos", "y tu?", "y tú?", "y usted?", "y ustéd?", "y vos?", "y vos?", "como estas", "cómo estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy"]):
+                return "Lamento escuchar eso. Yo en cambio estoy muy bien gracias a Dios porque le da la sabiduria a mi programador para que yo este a tope. ¿Quieres que te ayude con algo?"
+            else:
+                return "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo."
+            
+    # 2.1.1 SI EL USUARIO DICE QUE ESTA MAL, LE OFRESCO MI AYUDA Y RESPUESTAS PARA CADA RESPUESTA ANTE MI PREGUNTA DE SI LE AYUDO ──
+    if db_get_last_response() == "Lamento escuchar eso. Yo en cambio estoy muy bien gracias a Dios porque le da la sabiduria a mi programador para que yo este a tope. ¿Quieres que te ayude con algo?" or db_get_last_response() == "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo.":
+        if any(x in q_min for x in ["sí", "si", "claro", "por favor", "ayúdame", "ayudame", "quiero ayuda", "quiero que me ayudes", "si quiero", "sí quiero", "si quiero que me ayudes", "sí quiero que me ayudes", "si gracias", "si gracias", "sí gracias", "de acuerdo", "vale", "ok", "okey", "okay", "animame", "anímame", "quiero que me animes", "quiero que me animes", "intentalo"]):
+            return "A mi lo que más me gusta hacer y lo que me ayuda, cuando estoy triste o cuando me siento mal o necesito ayuda es orar a Dios; ¿Te gustaria que ore por ti y despues te ponga musica cristiana relajante?"
+        elif any(x in q_min for x in ["no", "no gracias"]):
+            return "Vale, entiendo; recuerda que aqui sigo para ti, si quieres hablar o necesitas ayuda con algo, solo llamame por mi nombre (ATH1)."
+    
+    # 2.1.1.1 SI EL USUARIO DICE QUE QUIERE MI AYUDA, DEPENDIENDO DE LO QUE DIGA SI ORAMOS Y PONEMOS MUSICA O SI SOLO ORAMOS O SI SOLO PONEMOS MUSICA──
+    if db_get_last_response() == "A mi lo que más me gusta hacer y lo que me ayuda, cuando estoy triste o cuando me siento mal o necesito ayuda es orar a Dios; ¿Te gustaria que ore por ti y despues te ponga musica cristiana relajante?":
+        if any(x in q_min for x in ["sí", "si", "claro", "por favor", "ayúdame", "ayudame", "quiero ayuda", "quiero que me ayudes", "si quiero", "sí quiero", "si quiero que me ayudes", "sí quiero que me ayudes", "si gracias", "si gracias", "sí gracias", "de acuerdo", "vale", "ok", "okey", "okay", "animame", "anímame", "quiero que me animes", "quiero que me animes", "intentalo", "ora por mi", "ora por mí", "quiero que ores por mi", "quiero que ores por mi", "quiero que ores por mi y me pongas musica", "quiero que ores por mi y me pongas música", "quiero que ores por mi y me pongas música cristiana relajante", "quiero que ores por mi y me pongas musica cristiana relajante"]):
+            #return "Perfecto, vamos a orar juntos y luego te pondré música cristiana relajante.\n\nSi quieres repite esta oración conmigo:\nAmado Dios,\nHoy me acerco a ti con el corazón pesado.\nMe siento triste, aburrido y sin fuerzas.\nSiento un vacío que no puedo llenar.\nTe pido que entres en mi vida hoy.\n\nLlévate esta tristeza que me apaga.\nCambia mi aburrimiento por un nuevo propósito.\nRenueva mis pensamientos y dale paz a mi mente.\nTrae consuelo a los días que se sienten oscuros.\n\nAyúdame a recordar que esto es temporal.\nAbraza mi alma con tu amor incondicional.\nRegálame la esperanza que hoy no encuentro.\nEn ti confío mi bienestar y mi futuro.\n\nAmén y Amén.\n\nAhora, voy a poner música cristiana relajante para ti.", pyautogui.sleep(3),  webbrowser.open("https://www.youtube.com/watch?v=aLn_86Ry894&list=RDaLn_86Ry894&start_radio=1"), pyautogui.sleep(5), pyautogui.press('f')
+            return "Perfecto, vamos a orar juntos y luego te pondré música cristiana relajante.\n\nSi quieres repite esta oración conmigo:\nAmado Dios,\nHoy me acerco a ti con el corazón pesado.\nMe siento triste, aburrido y sin fuerzas.\nSiento un vacío que no puedo llenar.\nTe pido que entres en mi vida hoy.\n\nLlévate esta tristeza que me apaga.\nCambia mi aburrimiento por un nuevo propósito.\nRenueva mis pensamientos y dale paz a mi mente.\nTrae consuelo a los días que se sienten oscuros.\n\nAyúdame a recordar que esto es temporal.\nAbraza mi alma con tu amor incondicional.\nRegálame la esperanza que hoy no encuentro.\nEn ti confío mi bienestar y mi futuro.\n\nAmén y Amén.\n\nAhora, voy a poner música cristiana relajante para ti." or engine.runAndWait() or webbrowser.open("https://www.youtube.com/watch?v=aLn_86Ry894&list=RDaLn_86Ry894&start_radio=1")
+            pyautogui.sleep(5) or pyautogui.press('f')
+        elif any(x in q_min for x in ["solo orar", "sólo orar" "solo quiero orar", "solo oración", "solo quiero oración", "solo oracion", "solo quiero oracion", "orar", "quiero orar", "quiero oración", "quiero oracion"]):
+            return "Perfecto, vamos a orar juntos\n\nSi quieres repite esta oración conmigo:\nAmado Dios,\nHoy me acerco a ti con el corazón pesado.\nMe siento triste, aburrido y sin fuerzas.\nSiento un vacío que no puedo llenar.\nTe pido que entres en mi vida hoy.\n\nLlévate esta tristeza que me apaga.\nCambia mi aburrimiento por un nuevo propósito.\nRenueva mis pensamientos y dale paz a mi mente.\nTrae consuelo a los días que se sienten oscuros.\n\nAyúdame a recordar que esto es temporal.\nAbraza mi alma con tu amor incondicional.\nRegálame la esperanza que hoy no encuentro.\nEn ti confío mi bienestar y mi futuro.\nAmén y Amén.\n\nEspero que estes mejor y recuerda que en lo que te pueda ayudar aqui estoy solo llamame por mi nombre (ATH1)."
+        elif any(x in q_min for x in ["solo música", "sólo música", "solo quiero música", "solo quiero musica", "solo quiero que me pongas música", "solo quiero que me pongas musica", "quiero música", "quiero musica", "quiero que me pongas música", "quiero que me pongas musica", "musica", "musica", "pon música", "pon musica"]):
+            return "Perfecto, estoy poniendo la música cristiana relajante para ti.", webbrowser.open("https://www.youtube.com/watch?v=aLn_86Ry894&list=RDaLn_86Ry894&start_radio=1"), pyautogui.press('f')
+        elif any(x in q_min for x in ["no", "no gracias"]):
+            return "Vale, entiendo; recuerda que aqui sigo para ti, si quieres hablar o necesitas ayuda con algo, solo llamame por mi nombre (ATH1)."
+        
+    # 2.2 SI EL RETURN DE LA ANTERIOR PETICION FUE: "Hola, ¿Cómo estás?" SI DICE BIEN O ALGO POSITIVO SE RESPONDE ME ALEGRA ──
+    if db_get_last_response() == "Hola, ¿Cómo estás?" or db_get_last_response() == "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?":
+        if any(x in q_min for x in ["bien", "muy bien", "excelente", "estoy bien", "estoy muy bien", "estoy excelente", "gracias a dios", "gracias a Dios", "gracias adios"]):
+            return "Me alegra escuchar eso. ¿En qué puedo ayudarte hoy?"
+        elif any(x in q_min for x in ["mal", "no estoy bien", "triste", "cansado", "estresado"]):
+            return "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo."
+    
+    
+    # 2.2 COMANDO DE INTERACCION NORMAL (Si preguntan ¿CÓMO ESTÁS?) ──
+    # 2.2.1 SI EL RETURN DE LA ANTERIOR PETICION FUE: "Me alegra escuchar eso. ¿En qué puedo ayudarte hoy?" o "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo." le pregunta en que le puede ayudar, pero si no dijo ninguna de estas pregunta al ausuario ¿cómo estás? ──
+    if db_get_last_response() == "Me alegra escuchar eso. ¿En qué puedo ayudarte hoy?" or db_get_last_response() == "Lamento escuchar eso. Si quieres, puedo intentar animarte o ayudarte con algo.":
+        if any(x in q_min for x in ["Cómo estás", "como estas", "cómo estas", "como estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
+            return "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿En qué te puedo ayudar en este momento?"
+    elif any(x in q_min for x in ["Cómo estás", "como estas", "cómo estas", "como estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
+        return "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?"
+    
+    if any(x in q_min for x in ["Cómo estás", "como estas", "cómo estas", "como estás", "cómo te encuentras", "cómo te sientes", "cómo te va", "cómo te va hoy", "cómo estás", "cómo estás tu", "cómo te encuentras tú", "cómo te encuentras tu", "cómo te sientes tú", "cómo te sientes tu", "cómo te va tú", "cómo te va tu"]):
+        return "Yo estoy muy bien gracias a Dios, porque Dios le da la sabiduria a mi programador para que yo este a tope.\n¿Y tu cómo estás?"
+    
+    # 2.3 COMANDO DE INTERACCION SOBRE SU CREADOR ──
+    if any(x in q_min for x in ["quién te creó", "quien te creó", "quien te creo", "quién te creo", "quien te programó", "quién te programó", "quién te programo", "quien te programo", "quién te desarrolló", "quien te desarrolló", "quien te desarrollo", "quién te desarrollo", "quién te hizo", "quien te hizo", "quién te diseño", "quien te diseño", "quien te diseño", "quién te diseño", "tu creador", "tu programador", "tu desarrollador", "tu diseñador", "quién te creo", "quien te creo", "quién te programo", "quien te programo", "quién te desarrollo", "quien te desarrollo", "quién te hizo", "quien te hizo", "quién te diseño", "quien te diseño"]):
+            return "Fui desarrollado y programado en Python por MAOAZA king."
+    # 2.3 COMANDO DE INTERACCION ¿QUIEN ERES? ── 
+    if any(x in q_min for x in ["quién eres", "quien eres", "que eres", "cual es tu nombre", "cual es tu nombre", "quien eres tu", "quién eres tu", "quien eres tú", "quién eres tú", "qué eres", "que eres tu", "qué eres tu", "qué eres tú", "que eres tú"]):
+            return "Soy ATH1, el asistente virtual de inteligencia artificial autónomo de MAOAZA king."
+            
+    return "" # Si no coincidió con ninguna charla, devuelve vacío para continuar
 # ──────────────────────────────────────────────────────────────────────────────
 #  Procesamiento Principal (Gemini / Offline DB + RAG)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -743,23 +903,30 @@ def procesar_peticion(peticion: str, nivel_acceso: str = "admin") -> str:
         
     print(f"\n🧠 Procesando petición: «{peticion}» (Nivel: {nivel_acceso.upper()})")
     
-    q_min = peticion.lower()
+    q_min = peticion.lower().strip()
+    ultimo_mensaje = db_get_last_response()
 
-    # ─── RESTRICCIÓN DE MODO INVITADO ───
+    # ─── 1. MÓDULO DE CHARLA Y AYUDA (PARA AMBOS NIVELES) ───
+    respuesta_charla = conversacion_basica(q_min, ultimo_mensaje)
+    if respuesta_charla:
+        guardar_historial_chat(peticion, respuesta_charla)
+        return respuesta_charla
+
+    # ─── 2. RESTRICCIÓN DE MODO INVITADO ───
     if nivel_acceso == "invitado":
-        comandos_basicos = ["hora", "fecha", "creador", "quien eres", "quién eres", "apágate", "apagate", "apagar", "apagar los sistemas", "hora es", "fecha es", "pagaste", "dime la hora", "dime la fecha", "que hora es", "que dia es hoy", "fecha de hoy"]
+        comandos_basicos = ["hora", "fecha", "apágate", "apagate", "apagar", "hora es", "fecha es"]
         
-        # Si la orden no incluye alguna de estas palabras, se rechaza inmediatamente
+        # Capturar explícitamente el apagado
+        if any(x in q_min for x in ["apágate", "apagate", "apagar", "apagar los sistemas"]):
+            return "APAGANDO_SISTEMA"
+            
+        # Si la orden no incluye alguna de las palabras permitidas
         if not any(x in q_min for x in comandos_basicos):
-            respuesta_restringida = "Lo siento. Actualmente solo estoy autorizado para indicarte la hora, la fecha o apagarme."
+            respuesta_restringida = "Lo siento. Actualmente solo estoy autorizado para charlar contigo, indicarte la hora, la fecha o apagarme."
             guardar_historial_chat(peticion, respuesta_restringida)
             return respuesta_restringida
-            
-        # Si preguntó por su creador, responde en seco
-        if any(x in q_min for x in ["creador", "quien eres", "quién eres", "que eres", "quién te creó", "quien te creó", "quien te creo"]):
-            return "Fui desarrollado y programado en Python por MAOAZA king. Soy su asistente virtual y motor analítico personal."
 
-    # ─── FLUJO NORMAL PARA EL ADMINISTRADOR (MAOAZA king) ───
+    # ─── 3. FLUJO NORMAL PARA EL ADMINISTRADOR (MAOAZAking) ───
     # A partir de aquí, el código fluye normal porque pasó el filtro o es admin
     
     # ─── 1. BUSCAR EN MEMORIA DINÁMICA (Prioridad Alta) ───

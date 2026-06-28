@@ -59,7 +59,7 @@ def solicitar_desbloqueo():
     root.attributes("-topmost", True) # Fuerza la ventana al frente
     root.withdraw() # Oculta la ventana principal, deja solo el cuadro de diálogo
     
-    u = simpledialog.askstring("Seguridad ATH1", "Usuario:")
+    u = simpledialog.askstring("Seguridad ATH1", "Usuario:", show='*')
     p = simpledialog.askstring("Seguridad ATH1", "Contraseña:", show='*')
     
     root.destroy()
@@ -69,7 +69,7 @@ def solicitar_desbloqueo():
         nivel_acceso = "admin"
     else:
         print("[SISTEMA] ❌ Credenciales incorrectas.")
-        
+
 # Dejar el atajo escuchando en segundo plano de forma permanente
 try:
     keyboard.add_hotkey('ctrl+shift+f1', solicitar_desbloqueo)
@@ -97,6 +97,9 @@ def escaneo_facial_silencioso():
                     id_usuario, confianza = reconocedor.predict(rostro_recortado)
                     if id_usuario == 1 and confianza < 70:
                         nivel_acceso = "admin"
+                        print("[SISTEMA] ✅ Acceso de administrador concedido.")
+                    else:
+                        print("[SISTEMA] ❌ Credenciales incorrectas.")
         except Exception:
             pass
 
@@ -272,7 +275,27 @@ def transcribir_audio(wav_io) -> str:
         
     print("⚠️ No se detectó texto comprensible.")
     return ""
-
+# ──────────────────────────────────────────────────────────────────────────────
+#  Secuencia del Asistente Virtual
+# ──────────────────────────────────────────────────────────────────────────────
+def ejecutar_respuesta_cerebro(respuesta: str):
+    """Analiza la respuesta del cerebro para ejecutar acciones críticas o hablar."""
+    if not respuesta or not respuesta.strip():
+        return
+        
+    respuesta_limpia = str(respuesta).strip().upper()
+    
+    # 1. Capturar orden de apagado del sistema
+    if "APAGANDO_SISTEMA" in respuesta_limpia:
+        if nivel_acceso == "admin":
+            hablar("Hasta luego MAOAZAking, que tengas un excelente día. Cerrando sistemas.")
+        else:
+            hablar("Entendido, cerrando sistemas. Adiós.")
+        import os
+        os._exit(0)  # Cierra todo de forma fulminante
+        
+    # 2. Si no es un comando de sistema interno, simplemente lo dice en voz alta
+    hablar(respuesta)
 # ──────────────────────────────────────────────────────────────────────────────
 #  Secuencia del Asistente Virtual
 # ──────────────────────────────────────────────────────────────────────────────
@@ -283,20 +306,7 @@ def procesar_orden():
             texto = transcribir_audio(wav_io)
             if texto.strip():
                 respuesta = ath1_brain.procesar_peticion(texto, nivel_acceso)
-                respuesta_limpia = str(respuesta).strip().upper()
-                
-                # Capturar orden de apagado
-                if "APAGANDO_SISTEMA" in respuesta_limpia:
-                    if nivel_acceso == "admin":
-                        hablar("Hasta luego MAOAZAking, que tengas un buen día.")
-                    else:
-                        hablar("Adiós.")  # Ahora sí está separado para no-administradores
-                    
-                    import os
-                    os._exit(0)  # Cierra todo de forma fulminante tras hablar
-                
-                # Si no es apagado, dice la respuesta normal del cerebro
-                hablar(respuesta)
+                ejecutar_respuesta_cerebro(respuesta)
             else:
                 hablar("No logré comprender tu petición.")
         else:
@@ -307,34 +317,45 @@ def procesar_orden():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Llamar a TTS (Text-to-Speech)
+#  Llamar a TTS (Text-to-Speech) - MOTOR GLOBAL
 # ──────────────────────────────────────────────────────────────────────────────
+# Inicializamos el motor UNA sola vez para evitar colapsos de audio en Windows
+try:
+    motor_voz = pyttsx3.init()
+    voces = motor_voz.getProperty("voices")
+    for v in voces:
+        if "spanish" in v.name.lower() or "es" in v.id.lower():
+            motor_voz.setProperty("voice", v.id)
+            break
+    motor_voz.setProperty("rate", 155)
+except Exception as e:
+    print(f"⚠️ Error al inicializar motor de voz: {e}")
+    motor_voz = None
+
 def hablar(texto: str):
     """Pronuncia el texto de respuesta usando la voz del sistema operativo."""
-    print(f"  🔊  ATH1 dice: «{texto}»")
+    if not texto:
+        return
+        
+    # Obligamos a que sea un texto puro (Evita el error de las tuplas)
+    texto_puro = str(texto).strip()
+    print(f"  🔊  ATH1 dice: «{texto_puro}»")
 
     sistema = platform.system()
-
-    # macOS say utility
     if sistema == "Darwin":
         try:
-            subprocess.run(["say", "-v", "Monica", texto], check=True)
+            subprocess.run(["say", "-v", "Monica", texto_puro], check=True)
             return
         except Exception:
             pass
 
-    # Windows / Linux pyttsx3
-    engine = pyttsx3.init()
-    voices = engine.getProperty("voices")
-
-    for v in voices:
-        if "spanish" in v.name.lower() or "es" in v.id.lower():
-            engine.setProperty("voice", v.id)
-            break
-
-    engine.setProperty("rate", 155)
-    engine.say(texto)
-    engine.runAndWait()
+    # Usar el motor global sin reinicializarlo
+    if motor_voz:
+        try:
+            motor_voz.say(texto_puro)
+            motor_voz.runAndWait()
+        except Exception as e:
+            print(f"⚠️ Error de reproducción de audio: {e}")
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  Main Loop
@@ -440,11 +461,8 @@ def main():
                                 hablar("Entendido, vuelvo a modo de espera.")
                                 asistente_activo = False
                             else:
-                                # Aquí puedes llamar directo a tu lógica de procesamiento o procesar_orden()
-                                # NOTA: Asegúrate de que tu función procesar_orden() capture el 'texto' actual 
-                                # o llama directo a 'ath1_brain.procesar_peticion(texto)'
                                 respuesta = ath1_brain.procesar_peticion(texto, nivel_acceso)
-                                hablar(respuesta)
+                                ejecutar_respuesta_cerebro(respuesta) # <--- Usar la nueva función aquí
                             
                             # Limpieza e inicio limpio para la siguiente orden en cola
                             tiempo_ultima_orden = time.time()
