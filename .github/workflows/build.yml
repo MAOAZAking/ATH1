@@ -34,7 +34,7 @@ jobs:
     - name: Generar Archivo Binario (.EXE) Blindado
       run: |
         # SE AÑADIÓ --collect-all selenium PARA EMPAQUETARLO COMPLETAMENTE
-        pyinstaller --onefile --console --collect-all vosk --collect-all selenium --add-data ".env;." --name=ATH1_Asistente bienvenida_de_ATH1.py
+        pyinstaller --onefile --console --collect-all vosk --collect-all selenium --add-data ".env;." --name=ATH1_Asistente ath1_voice_templates.json ath1_name_variants.json ath1_knowledge.db modelo_facial.yml bienvenida_de_ATH1.py
 
     - name: Crear o Actualizar Release en GitHub
       uses: softprops/action-gh-release@v2
